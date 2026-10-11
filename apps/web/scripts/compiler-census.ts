@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-import { readFileSync } from "node:fs";
-import { relative, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { relative, resolve, sep } from "node:path";
 import { type NodePath, parseSync, transformFromAstSync, traverse, type types } from "@babel/core";
 import {
 	type LoggerEvent,
@@ -8,12 +8,14 @@ import {
 	parsePluginOptions,
 } from "babel-plugin-react-compiler";
 import { designSourceFiles } from "./designSources";
+import { type GeneratedFile, normalizeEol, writeOrCheck } from "./generatedFiles";
 
 // Must match `reactCompilerPreset()` in vite.config.ts.
 const COMPILER_OPTIONS: PluginOptions = {};
 const PRESET_FILTER = /\b[A-Z]|\buse/;
 
 const WEB_ROOT = resolve(import.meta.dir, "..");
+const BASELINE = resolve(import.meta.dir, "compiler-census.baseline.txt");
 const EXCLUDED = /\.(test|spec|stories)\.[tj]sx?$/;
 
 interface Bailout {
@@ -36,27 +38,63 @@ function locKey(loc: types.SourceLocation | null | undefined) {
 	return loc ? `${loc.start.line}:${loc.start.column}` : "";
 }
 
-function functionName(path: NodePath<types.Function>) {
-	const { node, parent } = path;
-	if ("id" in node && node.id) return node.id.name;
+function bindingName(path: NodePath): string | null {
+	const { node, parent, parentPath } = path;
 	if (parent.type === "VariableDeclarator" && parent.id.type === "Identifier")
 		return parent.id.name;
+	if (parent.type === "ObjectProperty" && !parent.computed && parent.key.type === "Identifier")
+		return parent.key.name;
 	if (parent.type === "ExportDefaultDeclaration") return "default";
+	if (parent.type === "CallExpression" && parent.callee !== node && parentPath) {
+		return bindingName(parentPath);
+	}
+	return null;
+}
+
+function ownName(path: NodePath<types.Function>) {
+	const { node, parent } = path;
+	if (node.type === "FunctionDeclaration" && node.id) return node.id.name;
+	const binding = bindingName(path);
+	if (binding) return binding;
+	if ("id" in node && node.id) return node.id.name;
 	if (parent.type === "CallExpression" && parent.callee.type === "Identifier") {
 		return `${parent.callee.name}(…)`;
 	}
 	return null;
 }
 
+function functionName(path: NodePath<types.Function>) {
+	const names = [ownName(path) ?? "<anonymous>"];
+	for (let owner = path.getFunctionParent(); owner; owner = owner.getFunctionParent()) {
+		const name = ownName(owner);
+		if (name) names.unshift(name);
+	}
+	return names.join(".");
+}
+
 function collectFunctionNames(ast: types.File) {
 	const names = new Map<string, string>();
 	traverse(ast, {
 		Function(path) {
-			const name = functionName(path);
-			if (name) names.set(locKey(path.node.loc), name);
+			names.set(locKey(path.node.loc), functionName(path));
 		},
 	});
 	return names;
+}
+
+function assertDistinctUnits(file: string, names: Map<string, string>, events: LoggerEvent[]) {
+	const units = new Map<string, string>();
+	for (const event of events) {
+		const loc = "fnLoc" in event ? locKey(event.fnLoc) : "";
+		const name = names.get(loc);
+		if (!name) continue;
+		if ((units.get(name) ?? loc) !== loc) {
+			throw new Error(
+				`compiler-census: ${file} has two compiler units named ${name}; rename one so the baseline can tell them apart`,
+			);
+		}
+		units.set(name, loc);
+	}
 }
 
 function toBailout(file: string, names: Map<string, string>, event: LoggerEvent): Bailout | null {
@@ -106,7 +144,7 @@ function toBailout(file: string, names: Map<string, string>, event: LoggerEvent)
 	};
 }
 
-function censusFile(absPath: string, code: string): FileResult {
+export function censusFile(absPath: string, code: string): FileResult {
 	const file = relative(WEB_ROOT, absPath);
 	if (!PRESET_FILTER.test(code)) return { compiled: 0, bailouts: [] };
 	const ast = parseSync(code, {
@@ -130,6 +168,7 @@ function censusFile(absPath: string, code: string): FileResult {
 		cloneInputAst: false,
 		plugins: [["babel-plugin-react-compiler", options]],
 	});
+	assertDistinctUnits(file, names, events);
 	return {
 		compiled: events.filter((e) => e.kind === "CompileSuccess").length,
 		bailouts: events.flatMap((e) => toBailout(file, names, e) ?? []),
@@ -178,8 +217,35 @@ function printHuman(census: ReturnType<typeof runCensus>) {
 	}
 }
 
+export function baselineEntries(bailouts: Bailout[]) {
+	const functions = new Set(
+		bailouts.map((b) => `${b.file.split(sep).join("/")} ${b.fnName ?? `:${b.fnLine ?? b.line}`}`),
+	);
+	return [...functions].sort();
+}
+
+function reportDrift({ path, content }: GeneratedFile) {
+	const lines = (text: string) => new Set(normalizeEol(text).split("\n").filter(Boolean));
+	const committed = lines(existsSync(path) ? readFileSync(path, "utf8") : "");
+	const current = lines(content);
+	for (const fn of current) {
+		if (!committed.has(fn)) console.error(`compiler-census: new bail-out: ${fn}`);
+	}
+	for (const fn of committed) {
+		if (!current.has(fn)) console.error(`compiler-census: now compiles: ${fn}`);
+	}
+}
+
 if (import.meta.main) {
 	const census = runCensus();
+	const check = process.argv.includes("--check");
 	if (process.argv.includes("--json")) console.log(JSON.stringify(census, null, 2));
-	else printHuman(census);
+	else if (check || process.argv.includes("--write")) {
+		const output = {
+			path: BASELINE,
+			content: `${baselineEntries(census.bailouts).join("\n")}\n`,
+		};
+		if (check) reportDrift(output);
+		writeOrCheck({ label: "compiler:census", version: "1", outputs: [output], check });
+	} else printHuman(census);
 }
