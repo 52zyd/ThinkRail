@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { type Browser, expect, type Page, test } from "@playwright/test";
+import { type Browser, expect, type Locator, type Page, test } from "@playwright/test";
 import {
 	createWorkspaceViaDialog,
 	openFixtureProject,
@@ -9,7 +9,13 @@ import {
 	worktreeRows,
 } from "./fixtures/app";
 import { E2E_DATA_DIR } from "./fixtures/paths";
-import { pierreDeletionsSide, selectPierreLine } from "./fixtures/pierre";
+import {
+	pierreDeletionsSide,
+	pierreGutterUtilityCell,
+	pierreHighlightedTokens,
+	pierreLineCenter,
+	selectPierreLine,
+} from "./fixtures/pierre";
 
 const worktree = () => join(E2E_DATA_DIR, "worktrees", "sample-project", "workspace-1");
 
@@ -360,6 +366,50 @@ test("Pierre line selection opens one inline composer", async ({ page }) => {
 	await page.getByTestId("review-composer-save").click();
 	await expect(composer).toHaveCount(0);
 	await expect(page.getByTestId("review-pending-badge")).toHaveText("1");
+});
+
+async function openHighlightedDiff(page: Page): Promise<Locator> {
+	await openDiff(page);
+	const diff = page.getByTestId("diff-view");
+	await expect(pierreHighlightedTokens(diff).first()).toBeVisible();
+	return diff;
+}
+
+test("a text-selection drag leaves the comment button on the line it started from", async ({
+	page,
+}) => {
+	const diff = await openHighlightedDiff(page);
+	const utility = pierreGutterUtilityCell(diff);
+	const one = await pierreLineCenter(diff, "one = 1");
+	const three = await pierreLineCenter(diff, "three = 3");
+
+	await page.mouse.move(one.x, one.y);
+	await expect(utility).toHaveAttribute("data-column-number", "1");
+	await page.mouse.down();
+	await page.mouse.move(three.x, three.y, { steps: 5 });
+	expect(await page.evaluate(() => window.getSelection()?.toString())).toContain("two = 2");
+	await expect(utility).toHaveAttribute("data-column-number", "1");
+	await page.mouse.up();
+
+	await page.mouse.move(three.x + 20, three.y);
+	await expect(utility).toHaveAttribute("data-column-number", "3");
+});
+
+test("a text-selection drag that leaves the diff on its first move keeps the comment button", async ({
+	page,
+}) => {
+	const diff = await openHighlightedDiff(page);
+	const utility = pierreGutterUtilityCell(diff);
+	const one = await pierreLineCenter(diff, "one = 1");
+	const box = await diff.boundingBox();
+	if (!box) throw new Error("No diff-view box");
+
+	await page.mouse.move(one.x, one.y);
+	await expect(utility).toHaveAttribute("data-column-number", "1");
+	await page.mouse.down();
+	await page.mouse.move(one.x, box.y - 12);
+	await expect(utility).toHaveAttribute("data-column-number", "1");
+	await page.mouse.up();
 });
 
 test("the Review panel carries its own send buttons: per-file at the file level, Send all at the files level", async ({
