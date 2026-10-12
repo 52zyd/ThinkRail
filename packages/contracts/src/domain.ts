@@ -674,6 +674,16 @@ export interface AppConfig extends ThemePreference {
 	terminalWindowsShell: TerminalWindowsShell;
 	/** Idle days after which a quiet workspace settles onto its project's shelf; `null` = never. */
 	settleIdleDays: number | null;
+	disabledExtensions: string[];
+}
+
+export interface ExtensionCatalogEntry {
+	name: string;
+	title: string;
+	description?: string;
+	enabled: boolean;
+	tools: string[];
+	hasChildExtensions: boolean;
 }
 
 /** How many recently chosen models the host remembers. */
@@ -760,6 +770,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	jbcentralQuotaEnabled: true,
 	jbcentralQuotaRefreshSeconds: JBCENTRAL_QUOTA_REFRESH_SECONDS.default,
 	settleIdleDays: SETTLE_IDLE_DAYS.default,
+	disabledExtensions: [],
 };
 
 export function normalizeThemePreference(value: unknown): ThemePreference {

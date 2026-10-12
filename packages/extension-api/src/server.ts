@@ -2,6 +2,8 @@ import type { ExtensionFactory } from "@earendil-works/pi-coding-agent";
 
 export interface ServerExtension {
 	name: string;
+	title?: string;
+	description?: string;
 	extensions: ExtensionFactory[];
 	childExtensions?: ExtensionFactory[];
 	skillPackages?: string[];
