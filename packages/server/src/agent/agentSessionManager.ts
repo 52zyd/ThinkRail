@@ -1590,9 +1590,7 @@ async function openDiskSession(
 	if (persistedModel) {
 		try {
 			exactModel = resolvePersistedModel(generation.runtime, persistedModel);
-		} catch {
-			throw new Error("The chat's saved model is unavailable.");
-		}
+		} catch {}
 	}
 	repairDanglingToolCalls(sessionManager);
 	await createParentSession(
