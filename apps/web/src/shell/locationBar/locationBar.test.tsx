@@ -78,7 +78,7 @@ test("a worktree renders project, workspace and branch · from base segments", (
 	expect(html).toMatch(caption);
 });
 
-test("an open PR adds the REMOTE chips and the PULL REQUEST chip link", () => {
+test("an open PR adds the Remote chips and the Pull request chip link", () => {
 	const html = render(worktree, review);
 	const ids = testids(html);
 	expect(ids).toEqual(
@@ -96,7 +96,7 @@ test("an open PR adds the REMOTE chips and the PULL REQUEST chip link", () => {
 	expect(html).toContain("PR #648");
 });
 
-test("a user-owned workspace shows a plain BRANCH caption; a URL-less review stays a static chip", () => {
+test("a user-owned workspace shows a plain Branch caption; a URL-less review stays a static chip", () => {
 	const html = render(userOwned, { kind: "pull-request", number: 1, behindCommits: 3 });
 	expect(html).not.toContain("scope-base");
 	expect(html).not.toContain("· from");
@@ -105,7 +105,7 @@ test("a user-owned workspace shows a plain BRANCH caption; a URL-less review sta
 	expect(html).toMatch(/<span data-testid="scope-review" data-kind="pull-request"/);
 });
 
-test("project home keeps only the PROJECT and WORKSPACE segments", () => {
+test("project home keeps only the Project and Workspace segments", () => {
 	const html = render(null);
 	expect(html).toContain('data-context="project-home"');
 	expect(html).toContain(">Project home<");
@@ -114,7 +114,7 @@ test("project home keeps only the PROJECT and WORKSPACE segments", () => {
 	expect(ids).not.toContain("scope-review-segment");
 });
 
-test("the first segment draws no hairline before the location and later segments do", () => {
+test("segments are separated by space alone and the first one starts flush", () => {
 	const html = render(worktree, review);
 	const segmentClasses = [
 		...html.matchAll(/data-testid="(scope-[a-z]+-segment)" class="([^"]*)"/g),
@@ -127,20 +127,26 @@ test("the first segment draws no hairline before the location and later segments
 		"scope-review-segment",
 	]);
 	for (const [id, classes] of segmentClasses) {
+		expect(classes.filter((c) => /(^|:)border/.test(c))).toEqual([]);
 		if (id === "scope-project-segment") {
-			expect(classes).toContain("border-l-0");
 			expect(classes).toContain("pl-0");
-			expect(classes).not.toContain("border-l");
-			expect(classes).not.toContain("pl-12");
+			expect(classes).not.toContain("pl-8");
 		} else if (id === "scope-workspace-segment") {
-			expect(classes).toEqual(
-				expect.arrayContaining(["border-l-0", "pl-0", "sm:border-l", "sm:pl-12"]),
-			);
+			expect(classes).toEqual(expect.arrayContaining(["pl-0", "sm:pl-8"]));
 		} else {
-			expect(classes).toContain("border-l");
-			expect(classes).toContain("pl-12");
+			expect(classes).toContain("pl-8");
 		}
 	}
+});
+
+test("every strip value shares one text style and no caption switches typeface", () => {
+	const html = render(worktree, review);
+	for (const id of ["scope-project-name", "scope-name", "scope-branch"]) {
+		expect(html).toMatch(new RegExp(`data-testid="${id}" class="[^"]*\\btr-title-section\\b`));
+	}
+	expect(html).not.toContain("tr-code-text");
+	const pill = pillClass.split(/\s+/);
+	expect(pill.filter((c) => /^text-text-/.test(c))).toEqual(["text-text-muted"]);
 });
 
 test("every interactive control in the drag strip opts out of dragging", () => {
@@ -179,7 +185,7 @@ test("the location bar never hard-codes typography or colour outside the token s
 	}
 });
 
-test("a merged review turns the PULL REQUEST chip info and drops the REMOTE segment", () => {
+test("a merged review turns the Pull request chip info and drops the Remote segment", () => {
 	const merged: OpenBranchReview = { ...review, state: "merged", changedAt: 1 };
 	const html = render(worktree, merged);
 	expect(html).toContain("Merged #648");
