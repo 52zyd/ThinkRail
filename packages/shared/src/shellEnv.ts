@@ -30,7 +30,7 @@ function probeLoginShellEnv(shell: string, interactive: boolean): Map<string, st
 	const args = interactive ? ["-l", "-i", "-c", script] : ["-l", "-c", script];
 	try {
 		const result = Bun.spawnSync([shell, ...args], {
-			env: { ...process.env, PATH: PROBE_BASE_PATH },
+			env: { ...process.env, PATH: PROBE_BASE_PATH, HISTFILE: "/dev/null", HISTSIZE: "0" },
 			timeout: 5000,
 			stdout: "pipe",
 			stderr: "ignore",
@@ -50,7 +50,7 @@ function defaultLoginShellProbe(): Map<string, string> | null {
 }
 
 const NEVER_IMPORTED_PREFIXES = ["PI_", "THINKRAIL_"];
-const NEVER_IMPORTED = new Set(["PATH", "PWD", "OLDPWD", "SHLVL", "_"]);
+const NEVER_IMPORTED = new Set(["PATH", "PWD", "OLDPWD", "SHLVL", "_", "HISTFILE", "HISTSIZE"]);
 
 export function loginShellImports(
 	processEnv: Record<string, string | undefined>,
