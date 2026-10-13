@@ -86,6 +86,7 @@ import {
 	subagentsFor,
 } from "./delegation";
 import { buildResourceLoader, disabledExtensions, toSkillCommands } from "./extensions";
+import { createMcpSessionHost, type McpProjectPolicy, type McpSessionHost } from "./mcp";
 import {
 	getPiRuntimeGeneration,
 	type PiRuntimeGeneration,
@@ -120,7 +121,7 @@ interface Entry {
 	commands: BackgroundCommands;
 	unsubscribeCommands: () => void;
 	resourceCascade?: Promise<void>;
-	shutdownEmitted?: Promise<void>;
+	shutdown?: { runner: AgentSession["extensionRunner"]; settled: Promise<void> };
 	resourcesClosing: boolean;
 	session: AgentSession;
 	generation: PiRuntimeGeneration;
@@ -145,6 +146,7 @@ interface Entry {
 	nudgePromptPending: boolean;
 	lastPublishedState: string | null;
 	askUserQuestionWaiters: AskUserQuestionWaiters;
+	mcpHost: McpSessionHost;
 }
 
 const sessions = new Map<string, Entry>();
@@ -552,6 +554,14 @@ export function setSkillAdmissionResolver(
 	skillAdmissionResolver = resolver;
 }
 
+let mcpPolicyResolver: (workspaceId: string) => McpProjectPolicy = () => ({
+	approvals: {},
+	overrides: {},
+});
+export function setMcpPolicyResolver(resolver: (workspaceId: string) => McpProjectPolicy): void {
+	mcpPolicyResolver = resolver;
+}
+
 function piResourceTrustFor(workspaceId: string): boolean {
 	return skillAdmissionResolver(workspaceId).piResourceTrusted;
 }
@@ -771,17 +781,35 @@ function reconsiderPendingReload(entry: Entry): void {
 function runGatedReload(entry: Entry): Promise<void> {
 	if (entry.reloadRunning) return entry.reloadRunning;
 	entry.reloadPending = false;
+	const runner = entry.session.extensionRunner;
+	const beforeSessionStart = () => {
+		if (entry.disposed || entry.resourcesClosing) throw new Error("The chat is closing.");
+	};
 	entry.reloadRunning = (async () => {
 		try {
-			await entry.session.reload();
+			await entry.mcpHost.shutdownEngine(
+				{ type: "session_shutdown", reason: "reload" },
+				runner.createContext(),
+			);
+			beforeSessionStart();
+			await entry.session.reload({ beforeSessionStart });
+			beforeSessionStart();
 		} finally {
-			// Open the gate before flushing: completion delivery is refused while it is held.
-			entry.reloadRunning = null;
-			if (!entry.disposed) applyExtensionTools(entry, { allowReload: false });
-			entry.commands.flushCompletions();
-			entry.subagents.flushCompletions();
-			publishEntryState(entry);
-			reconsiderPendingReload(entry);
+			if (entry.disposed || entry.resourcesClosing) {
+				if (entry.session.extensionRunner !== runner) {
+					await emitSessionShutdown(entry);
+					entry.session.dispose();
+				}
+				entry.reloadRunning = null;
+				entry.reloadPending = false;
+			} else {
+				entry.reloadRunning = null;
+				applyExtensionTools(entry, { allowReload: false });
+				entry.commands.flushCompletions();
+				entry.subagents.flushCompletions();
+				publishEntryState(entry);
+				reconsiderPendingReload(entry);
+			}
 		}
 	})();
 	return entry.reloadRunning;
@@ -931,6 +959,7 @@ async function prepareSessionEntry(
 	commands: BackgroundCommands,
 	subagents: Subagents,
 	askUserQuestionWaiters: AskUserQuestionWaiters,
+	mcpHost: McpSessionHost,
 	lastSettlement: AgentSettlement | null | undefined = undefined,
 ): Promise<PreparedSessionEntry> {
 	const { sessionId } = session;
@@ -963,6 +992,7 @@ async function prepareSessionEntry(
 		nudgePromptPending: false,
 		lastPublishedState: null,
 		askUserQuestionWaiters,
+		mcpHost,
 	};
 	entry.unsubscribeCommands = commands.onChange(() => {
 		if (canUseSessionResources(sessionId, workspaceId))
@@ -1111,6 +1141,7 @@ async function registerSession(
 	commands: BackgroundCommands,
 	subagents: Subagents,
 	askUserQuestionWaiters: AskUserQuestionWaiters,
+	mcpHost: McpSessionHost,
 	lifecycleToken: WorkspaceLifecycleToken,
 	announceCreation = false,
 ): Promise<CreateSessionResult> {
@@ -1121,6 +1152,7 @@ async function registerSession(
 		commands,
 		subagents,
 		askUserQuestionWaiters,
+		mcpHost,
 	);
 	if (
 		!workspaceAcceptsSessions(workspaceId, lifecycleToken) ||
@@ -1207,6 +1239,7 @@ async function createParentSessionInternal(
 	const { sessionManager, settingsManager, cwd } = options;
 	const sessionId = sessionManager.getSessionId();
 	const askUserQuestionWaiters = createAskUserQuestionWaiters();
+	const mcpHost = createMcpSessionHost(() => mcpPolicyResolver(workspaceId));
 	const canDeliverCompletion = () =>
 		canUseSessionResources(sessionId, workspaceId) &&
 		!askUserQuestionWaiters.hasRecoverableCall() &&
@@ -1243,7 +1276,11 @@ async function createParentSessionInternal(
 				settingsManager,
 				() => skillAdmissionResolver(workspaceId),
 				generation.excludedSessionExtensionPaths,
-				[subagents.extension, createBackgroundCommandsExtension({ service: commands })],
+				[
+					subagents.extension,
+					createBackgroundCommandsExtension({ service: commands }),
+					...mcpHost.extensions,
+				],
 				askUserQuestionWaiters,
 			),
 		});
@@ -1255,6 +1292,7 @@ async function createParentSessionInternal(
 			commands,
 			subagents,
 			askUserQuestionWaiters,
+			mcpHost,
 			lifecycleToken,
 			announceCreation,
 		);
@@ -1928,8 +1966,9 @@ async function steerEntry(
 	const disposition = await queueSessionMessage(entry, "steering", text, images, () =>
 		entry.session.steer(text, images),
 	);
-	if (disposition === "queued" && entry.askUserQuestionWaiters.supersede())
-		publishEntryState(entry);
+	if (disposition !== "queued") return;
+	entry.mcpHost.cancelPendingConfirmations();
+	if (entry.askUserQuestionWaiters.supersede()) publishEntryState(entry);
 }
 
 export async function promptSession(
@@ -2246,24 +2285,38 @@ function trackCascade(workspaceId: string, cascade: Promise<void>): Promise<void
 
 const SESSION_SHUTDOWN_BUDGET_MS = 3000;
 
-function emitSessionShutdown(entry: Entry, timeoutMs = SESSION_SHUTDOWN_BUDGET_MS): Promise<void> {
-	let timer: ReturnType<typeof setTimeout> | undefined;
-	const runner = entry.session.extensionRunner;
-	const event = { type: "session_shutdown", reason: "quit" } as const;
-	// Started synchronously: the synchronous teardown path disposes the pi session right after, and
-	// handlers must have started by then.
-	const emitted = runner.emit(event).then(
+function settleShutdownStep(entry: Entry, step: () => Promise<unknown>): Promise<void> {
+	let running: Promise<unknown>;
+	try {
+		running = step();
+	} catch (error) {
+		running = Promise.reject(error);
+	}
+	return running.then(
 		() => {},
 		(error) => {
 			log.debug(`session ${entry.session.sessionId} shutdown handlers failed`, error as Error);
 		},
 	);
-	return Promise.race([
-		emitted,
+}
+
+function emitSessionShutdown(entry: Entry, timeoutMs = SESSION_SHUTDOWN_BUDGET_MS): Promise<void> {
+	const runner = entry.session.extensionRunner;
+	if (entry.shutdown?.runner === runner) return entry.shutdown.settled;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const event = { type: "session_shutdown", reason: "quit" } as const;
+	const steps = [
+		settleShutdownStep(entry, () => entry.mcpHost.shutdownEngine(event, runner.createContext())),
+		settleShutdownStep(entry, () => runner.emit(event)),
+	];
+	const settled = Promise.race([
+		Promise.all(steps).then(() => {}),
 		new Promise<void>((resolve) => {
 			timer = setTimeout(resolve, timeoutMs);
 		}),
 	]).finally(() => clearTimeout(timer));
+	entry.shutdown = { runner, settled };
+	return settled;
 }
 
 function closeSessionResources(entry: Entry, timeoutMs?: number): Promise<void> {
@@ -2272,17 +2325,21 @@ function closeSessionResources(entry: Entry, timeoutMs?: number): Promise<void> 
 	entry.subagents.dispose();
 	const closing = entry.commands.dispose(timeoutMs === undefined ? undefined : { timeoutMs });
 	const children = disposeSessionChildren(entry.workspaceId, entry.session.sessionId);
-	entry.shutdownEmitted = emitSessionShutdown(entry, timeoutMs);
+	const shutdown = emitSessionShutdown(entry, timeoutMs);
 	entry.resourceCascade = trackCascade(
 		entry.workspaceId,
-		Promise.allSettled([closing, children, entry.shutdownEmitted]).then(() => {}),
+		Promise.allSettled([closing, children, shutdown]).then(() => {}),
 	);
 	return entry.resourceCascade;
 }
 
 // `dispose()` invalidates the extension context the session_shutdown handlers are still using.
 function disposePiSessionAfterShutdown(entry: Entry): void {
-	void (entry.shutdownEmitted ?? Promise.resolve()).then(() => entry.session.dispose());
+	const shutdown = entry.shutdown;
+	if (!shutdown) return;
+	void shutdown.settled.then(() => {
+		if (entry.session.extensionRunner === shutdown.runner) entry.session.dispose();
+	});
 }
 
 function trackSessionTeardown(sessionId: string, cascade: Promise<void>): Promise<void> {
