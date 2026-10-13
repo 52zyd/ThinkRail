@@ -182,15 +182,18 @@ export function toSkillCommands(skills: readonly Skill[]): SlashCommandInfo[] {
 	}));
 }
 
-let devWebAccessFactory: BundledExtensionFactory | undefined;
+let devWebAccessFactory: Promise<BundledExtensionFactory> | undefined;
+const devWebAccess: BundledExtensionFactory = async (pi) => {
+	devWebAccessFactory ??= import("jiti").then(({ createJiti }) =>
+		createJiti(import.meta.url).import<BundledExtensionFactory>("pi-web-access/index.ts", {
+			default: true,
+		}),
+	);
+	await (await devWebAccessFactory)(pi);
+};
+
 function webAccessFactory(): BundledExtensionFactory {
-	if (bundled) return bundled.webAccessFactory;
-	if (!devWebAccessFactory) {
-		const require = createRequire(import.meta.url);
-		const loaded: { default: BundledExtensionFactory } = require("pi-web-access/index.ts");
-		devWebAccessFactory = loaded.default;
-	}
-	return devWebAccessFactory;
+	return bundled ? bundled.webAccessFactory : devWebAccess;
 }
 
 let disabledExtensionsResolver: () => ReadonlySet<string> = () => new Set();

@@ -102,6 +102,11 @@ Dependency direction is one-way: `scenario` → everything; `dialog`/`signals`/`
 - **Forbidden:** `@thinkrail/server`'s root export (evaluates the Bun-only `host`), `apps/*`, any
   browser/page fixture, model selection (`setModel` would persist a default into the shared isolated
   agent dir mid-run).
+- **Node-loadable server barrel.** The harness runs in Playwright's Node process, so the module graph
+  behind `@thinkrail/server/agent` must load without Bun-only resolution: no directory or extensionless
+  deep imports, no raw `require` of TypeScript under `node_modules`. A violation fails every live
+  scenario at session creation, before any skill runs — the suite was silently unrunnable this way
+  until 2026-10.
 
 ## Suites
 
@@ -110,7 +115,9 @@ Dependency direction is one-way: `scenario` → everything; `dialog`/`signals`/`
 - `routing.live.spec.ts` — the routing suite (slice 2): one scenario per route of the two routers'
   classification tables — workflow-eligible root routes are reached through the always-on rule; the
   dispatcher is force-loaded via the app's exact `/skill:` seed (which injects the skill content, so
-  no read of its own SKILL.md is expected). Pass = the routed worker's skill-load signal; direct-work
+  no read of its own SKILL.md is expected). The brainstorming route is pinned from both edges of its
+  default entry: a small, explicitly specified behavior change and a bug report (which must reach the
+  bug branch before any source edit). Pass = the routed worker's skill-load signal; direct-work
   rows bypass worker skills and produce a grounded outcome. Direct-edit assertions pin the resulting
   worktree, not incidental report vocabulary or which valid mutation tool the agent chose.
 - `smoke.live.spec.ts` — the infra-proving live scenarios: a mid-flow `brainstorming` round-trip that
