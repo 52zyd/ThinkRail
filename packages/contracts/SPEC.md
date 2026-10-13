@@ -808,6 +808,7 @@ contracts only.
   entry (the entry loads only while it still has that fingerprint, so an edit lapses the approval), and
   `Project.mcpOverrides` holds the project's enablement and exposure of user-level servers, never written
   to `.pi/mcp.json`; `ProjectTrustSummary.mcpServers` counts the repository's entries (see Project trust).
+  That count is optional because project-trust hosts predating MCP omit it; clients interpret absence as zero.
 - Every request names its target: `workspaceId` for configuration (project scope = that workspace's
   `.pi/mcp.json`; `user` = the global file), plus `sessionId` for per-session actions (`reconnect`,
   `setSessionOverride`, `readOutput`). The host has no notion of an "active workspace".
@@ -837,8 +838,8 @@ contracts only.
   carries into the latest stored override atomically (a client sends only what changed, so concurrent
   clients do not overwrite each other's setting). Enablement must be boolean and exposure one of
   `deferred`, `direct`, `hidden`; malformed runtime values fail with `MCP_CONFIG_INVALID`.
-  `setSessionOverride` is the per-chat disable: it applies to `mcp.json` servers only — a
-  `SessionResources.mcpServers` row with
+  `setSessionOverride` is the chat-resources "Disable in this chat": it applies to `mcp.json` servers only —
+  a `SessionResources.mcpServers` row with
   `registered: true` is a server an extension registered (its `transport` is that registration's), and
   disabling it fails with `MCP_CONFIG_INVALID`; where MCP is handled elsewhere it fails with
   `MCP_HANDLED_ELSEWHERE`. `mcp.reconnect` resolves once pi reconnected the server and rejects with pi's

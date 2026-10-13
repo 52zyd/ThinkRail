@@ -33,7 +33,7 @@ batches high-frequency Pi events without allowing later wire messages to overtak
   `resume` repairs them all at once by restating the truth rather than confirming the confirmations —, channel
   `subscribe` with last-value replay for snapshots; append-only terminal data and the one-shot terminal
   exit/detach + session-creation/deletion + `provider.changed` invalidation + addressed `feedback.interview`
-  channels, plus scoped `session.resourcesChanged` invalidations, are never cached or replayed to late
+  channels, plus scoped `session.resourcesChanged` invalidations and per-session `mcp.status` snapshots, are never cached or replayed to late
   subscribers. Resource metadata hydration belongs to the mounted chat integration, not replayed
   invalidation payloads. Reconnect/backoff;
   `inferUrl` defaults to
@@ -69,7 +69,8 @@ batches high-frequency Pi events without allowing later wire messages to overtak
   `provider.status`), each valid `server.welcome` first clearing any popup projection left by a host restart,
   then `feedback.interview` via the idempotent `showInterviewPrompt()` (a surviving host claim re-delivers the
   addressed event immediately after welcome),
-  `workspace.fsChanged` via `noteFsChanged(payload)`, and **`settings.changed`** via `applyConfig(config)` — the post-startup server-synced app config broadcast;
+  `workspace.fsChanged` via `noteFsChanged(payload)`, **`mcp.status`** via the generation-guarded
+  `applyMcpStatus(snapshot)`, and **`settings.changed`** via `applyConfig(config)` — the post-startup server-synced app config broadcast;
   welcome config lands in the atomic install above.
 
   **Session state hydrates on every supported welcome.** `session.stateList` is tokenized by connection
@@ -108,8 +109,28 @@ batches high-frequency Pi events without allowing later wire messages to overtak
   `session.getMessages` wrapper also rejects unless the returned summary exactly matches both requested
   workspace and session, making that untrusted-response identity check one shared installation boundary rather
   than a caller convention).
+- **`mcp.ts`** is the one MCP read path shared by Settings and the chat Resources view:
+  **`requestMcpList(method, params)`** serializes `mcp.list` and every list-returning mutation per workspace
+  and connection generation, including installation through `installMcpList` before dispatching the next
+  request. This prevents an older list or mutation reply from overwriting newer configuration or live-chat
+  membership. Only a plain read at the queue's tail is shared: a read requested after a queued mutation
+  must wait for that mutation and issue a fresh read, never reuse a pre-mutation read. Mutations are never
+  shared. The store's `selectMcpRead` installation token is captured at actual dispatch, not enqueue time,
+  preserving authoritative session omission while retaining pushes that arrive during the request. Queued
+  requests recheck MCP availability, workspace removal and their captured connection generation before
+  dispatch; stale queued work rejects without sending, and already-dispatched replies retain the store's
+  connection and deletion fences. A new connection starts independently of an older generation's tail,
+  workspaces do not block one another, and failed requests reject their callers without poisoning the queue
+  or preventing a retry. This queue is transient transport coordination, not a second state owner.
+  **`watchMcpWorkspace(workspaceId, onRead?)`** reads once and then re-reads with bounded backoff
+  (1 → 13 s, six attempts per streak) only while a live chat of that workspace still reports a server
+  `starting`. The host's `mcpSessions.capture` continues after its caller times out and eventually publishes
+  the settled status, including a connected edge; the bounded browser poll remains a refresh helper, not
+  the sole completion path. The streak budget resets once nothing is starting; disposal cancels the timer
+  and suppresses late watcher callbacks. Independent watchers share reads only under the tail rule above.
 - **Public surface (barrel):** `initTransport`, `getTransport`, `prewarmWorkspaceSkillLoad`, the three
-  skill-load-safe session request wrappers, `errorText`, `RequestError`, `wsErrorCode`, `ConnectionStatus`,
+  skill-load-safe session request wrappers, `errorText`, `RequestError`, `wsErrorCode`,
+  `requestMcpList`, `watchMcpWorkspace`, `ConnectionStatus`,
   `TransportOptions`, `runHostUpdate`, `supportsHostUpdateRun`, `supportsPlanReview`,
   `supportsPlanSummaryGeneration`, `supportsChangeMutations`, `supportsRichAnchors`, `supportsTurnChanges`. `runHostUpdate` is the typed empty host action
   and `supportsHostUpdateRun` lets `Shell` inject it only for protocol v70+; `supportsPlanReview` is exported
