@@ -154,6 +154,9 @@ const ChatTranscript = forwardRef<
 		onTryAgain: () => void;
 		historyOpen: boolean;
 		stillRunning: { count: number; onOpen: () => void } | undefined;
+		readMcpOutput?: ChatActions["readMcpOutput"];
+		openMcpSettings?: ChatActions["openMcpSettings"];
+		openProviderSettings?: ChatActions["openProviderSettings"];
 		resourcesOverlay?: ReactNode;
 	}
 >(function ChatTranscript(
@@ -167,6 +170,9 @@ const ChatTranscript = forwardRef<
 		onTryAgain,
 		historyOpen,
 		stillRunning,
+		readMcpOutput,
+		openMcpSettings,
+		openProviderSettings,
 		resourcesOverlay,
 	},
 	ref,
@@ -495,8 +501,20 @@ const ChatTranscript = forwardRef<
 			focusComposer,
 			openSubagentTranscript,
 			revealChatElement: revealElement,
+			readMcpOutput,
+			openMcpSettings,
+			openProviderSettings,
 		}),
-		[cancelAutomaticReveal, focusComposer, openSubagentTranscript, revealElement, sessionId],
+		[
+			cancelAutomaticReveal,
+			focusComposer,
+			openMcpSettings,
+			openProviderSettings,
+			openSubagentTranscript,
+			readMcpOutput,
+			revealElement,
+			sessionId,
+		],
 	);
 
 	return (
