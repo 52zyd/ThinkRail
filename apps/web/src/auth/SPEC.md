@@ -23,7 +23,8 @@ not here — `auth` stays presentational + types, so nothing here imports `store
   - `loginState` — the **types** `LoginState` (+ `LoginInput`/`LoginInputSelect`/`LoginInputPrompt`): the
     client-accumulated state of one login. Its doc pins the accumulation contract the store's reducer
     implements — frames **add**, they don't replace (`url` can be live alongside a paste `prompt`, the
-    browser-vs-paste race), `status` goes `active → success/error`. **Types only** (like `chat/types`).
+    browser-vs-paste race), `status` goes `active → success/error`. An optional `target` names the MCP
+    server of an MCP sign-in or connection test (`LoginPush.target`). **Types only** (like `chat/types`).
   - `LoginDialog` — **props-driven, no store/transport** (like the chat renderers): renders a `LoginState`
     (open-URL button + selectable URL; a device code with a **clickable verification link** that also
     **auto-opens** in a new tab best-effort on arrival; a `select`/`prompt` input — a `secret`-flagged
@@ -38,15 +39,23 @@ not here — `auth` stays presentational + types, so nothing here imports `store
 
 ## Integration (owned by the caller, not here)
 
-- The **store** holds the single `activeLogin: LoginState | null` (flat, session-less) and owns the frame
+- The **store** holds the single `activeLogin: LoginState | null` (flat, session-less), reserves login
+  startup synchronously across Providers and MCP before either sends a request, and owns the frame
   reducer (`foldLoginFrame`) — never under a session runtime (that path drops frames pre-session).
+  A failed start releases the reservation; a frame may still create the matching dialog before the
+  start response. A late response never replaces a different active login.
 - The **`provider.login` channel** is routed to `store.applyLoginFrame` in `transport/wireTransport`.
 - `panels/ProvidersSettings` (the Providers section of the Settings dialog) is the integration piece: it
   starts a login (`provider.loginStart` with `type` `"oauth"` or `"api_key"` — both auth routes ride the
   same channel, issue #97 — → `store.beginLogin`), mounts `LoginDialog` from `store.activeLogin`,
   wires `onReply`/`onCancel` to `provider.loginReply`/`loginCancel`, and re-fetches `provider.status` when a
-  login (or logout) settles. (The Welcome screen only carries `panels/ProviderWarningBanner`, which
-  opens Settings → Providers when no provider is connected.)
+  login (or logout) settles; it ignores a login that carries a `target`. (The Welcome screen only carries
+  `panels/ProviderWarningBanner`, which opens Settings → Providers when no provider is connected.)
+- `panels/McpSettings` is the second integration piece: `mcp.login` / `mcp.testConnection` return a login id
+  whose `provider.login` frames reach only the starting connection; it begins the login with the server as
+  `target`, mounts the same `LoginDialog` only for a targeted login, and answers through the same
+  `provider.loginReply` / `loginCancel`. The sign-in page still opens only from the dialog's button (the
+  desktop shell routes `window.open` to the system browser); the paste field takes the full redirected URL.
 
 ## Get right
 

@@ -357,6 +357,7 @@ export type LayoutIntentInput = LayoutIntent extends infer Intent
 export const SettingsSection = {
 	Providers: "providers",
 	Models: "models",
+	Mcp: "mcp",
 	Github: "github",
 	Appearance: "appearance",
 	LineWidth: "line-width",
@@ -965,6 +966,7 @@ interface AppState {
 	skillChangeTickByWorkspace: Record<string, number>;
 	skillsSyncedTickBySession: Record<string, number>;
 	activeLogin: LoginState | null;
+	loginStarting: boolean;
 	settingsOpen: boolean;
 	settingsSection: SettingsSection;
 	interviewPromptOpen: boolean;
@@ -1244,7 +1246,9 @@ interface AppState {
 	setChatDraft: (sessionId: string, text: string) => void;
 	clearPendingExtUi: (sessionId: string, id: string) => void;
 	applyExtUi: (request: ExtUiRequest) => void;
-	beginLogin: (loginId: string, providerId: string) => void;
+	reserveLogin: () => boolean;
+	finishLoginStart: () => void;
+	beginLogin: (loginId: string, providerId: string, target?: LoginPush["target"]) => void;
 	applyLoginFrame: (push: LoginPush) => void;
 	clearLoginInput: () => void;
 	clearLogin: () => void;
@@ -2038,8 +2042,12 @@ function withRuntime(
 	return next === rt ? {} : { sessions: { ...s.sessions, [sessionId]: next } };
 }
 
-function newLoginState(loginId: string, providerId: string): LoginState {
-	return { loginId, providerId, status: "active" };
+function newLoginState(
+	loginId: string,
+	providerId: string,
+	target: LoginPush["target"] | undefined,
+): LoginState {
+	return { loginId, providerId, status: "active", ...(target ? { target } : {}) };
 }
 
 function foldLoginFrame(state: LoginState, frame: LoginFrame): LoginState {
@@ -2167,6 +2175,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 	skillChangeTickByWorkspace: {},
 	skillsSyncedTickBySession: {},
 	activeLogin: null,
+	loginStarting: false,
 	settingsOpen: false,
 	settingsSection: SettingsSection.Providers,
 	interviewPromptOpen: false,
@@ -2466,6 +2475,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 				turnsByWorkspace: omitKey(state.turnsByWorkspace, workspaceId),
 				resourceSnapshots: omitKey(state.resourceSnapshots, workspaceId),
 				mcpByWorkspace: omitKey(state.mcpByWorkspace, workspaceId),
+				activeLogin:
+					state.activeLogin?.target?.workspaceId === workspaceId ? null : state.activeLogin,
 				sessionStateByWorkspace: omitKey(state.sessionStateByWorkspace, workspaceId),
 				skillChangeTickByWorkspace: omitKey(state.skillChangeTickByWorkspace, workspaceId),
 				specsByWorkspace: omitKey(state.specsByWorkspace, workspaceId),
@@ -4043,16 +4054,32 @@ export const useAppStore = create<AppState>((set, get) => ({
 			if (!s.sessions[request.sessionId]) return bufferExtUiOrphan(s, request);
 			return withRuntime(s, request.sessionId, (rt) => reduceExtUi(rt, request));
 		}),
-	beginLogin: (loginId, providerId) =>
-		set((s) =>
-			s.activeLogin?.loginId === loginId ? {} : { activeLogin: newLoginState(loginId, providerId) },
-		),
+	reserveLogin: () => {
+		const state = get();
+		if (state.loginStarting || state.activeLogin !== null) return false;
+		set({ loginStarting: true });
+		return true;
+	},
+	finishLoginStart: () => set({ loginStarting: false }),
+	beginLogin: (loginId, providerId, target) =>
+		set((s) => {
+			if (target && s.removedWorkspaceIds[target.workspaceId]) return {};
+			return {
+				activeLogin:
+					s.activeLogin?.loginId === loginId || s.activeLogin?.status === "active"
+						? s.activeLogin
+						: newLoginState(loginId, providerId, target),
+			};
+		}),
 	applyLoginFrame: (push) =>
 		set((s) => {
+			if (push.target && s.removedWorkspaceIds[push.target.workspaceId]) return {};
 			const cur = s.activeLogin;
 			if (cur && cur.loginId !== push.loginId && cur.status === "active") return {};
 			const base =
-				cur && cur.loginId === push.loginId ? cur : newLoginState(push.loginId, push.providerId);
+				cur && cur.loginId === push.loginId
+					? cur
+					: newLoginState(push.loginId, push.providerId, push.target);
 			return { activeLogin: foldLoginFrame(base, push.frame) };
 		}),
 	clearLoginInput: () =>

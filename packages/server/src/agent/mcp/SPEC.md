@@ -38,15 +38,16 @@ relax a rule.
 - `summaries.ts` — `summarizeMcpServers()`: one `McpServerSummary` per entry as written (an override-only
   project entry folds into its user-level server with both its `approval` and its validation error;
   an entry that is not an object
-  keeps its row with pi's `must be an object` error), with scope, defining file,
-  transport, masked endpoint (`maskMcpEndpoint`), whether this row is the admitted effective definition,
+  keeps its row with pi's `must be an object` error), with scope, defining file, the `fingerprint` of
+  the row's own raw entry (`fingerprintMcpEntry` over the entry as written in the defining file, at both
+  scopes — the identity a rewrite or removal must present), transport, masked endpoint (`maskMcpEndpoint`), whether this row is the admitted effective definition,
   configured vs effective exposure and enablement (record
   overrides and admitted repo overrides applied), OAuth applicability, replacement of a user-level server,
   approval state (`approved` / `pending` / `changed` against the current fingerprint), the configured
   description and pi-equivalent config errors (both through `redactMcpText`). `summarizeMcpConfigErrors()` is the file-level rest (unparsable
   JSON, `mcpServers` not an object, a mistyped `autoEnableCodemode`) as `{ source, message }`, masked, for
   `McpListResult.configErrors`: for the first two pi's loader lists none of that file's servers, so without
-  it `mcp.list` would read "no servers".
+  it Settings would read "no servers".
 - `redact.ts` — the host's one credential mask for text that leaves it. pi redacts nothing in its status
   texts: a connection error, an HTTP error-body snippet and a stdio server's stderr tail (up to 2 000
   chars) arrive verbatim. `redactMcpText` masks, deterministically and idempotently, URL user info and
@@ -62,7 +63,7 @@ relax a rule.
   with the value after a credential-named flag or assignment, URL-shaped arguments (user info, credential-named query values),
   header arguments (any value after `-H` / `--header`, a credential-named `Name: value` anywhere) and
   token-prefixed arguments masked; `${VAR}` references stay, and arguments with spaces, quotes or nothing in
-  them are JSON-quoted so the line is unambiguous (a client shows it as what runs).
+  them are JSON-quoted so the line is unambiguous (the approve dialog shows it as what runs).
 - `status.ts` — parsers for pi's two status texts (`formatStatus` lines `name: state[, N tools] (exposure)`
   with indented errors, and the startup attention notice) and `deriveMcpServerStatuses()`; the formats are
   pinned by fixtures and re-checked on every pi bump; multiline configuration diagnostics do not discard
@@ -93,7 +94,10 @@ relax a rule.
   of entry validity: scalar, null and array values occupy the name at both user and project scope, even
   if they appeared after the client's list read. Refusal changes neither file bytes nor approvals.
   Update intentionally still requires an existing object entry; it does not replace malformed
-  non-object values. The other helpers are `removeMcpServerEntry`, `projectMcpEntryFingerprint`, and
+  non-object values. The other helpers are `removeMcpServerEntry`, `mcpEntryFingerprint(scope, worktree,
+  name)` (the fingerprint of the raw entry currently in that scope's file — the global `mcp.json` or the
+  worktree's `.pi/mcp.json` — `undefined` when absent; what the host compares a rendered
+  `expectedFingerprint` against before any rewrite or removal), and
   `shareMcpOverrideWithRepo` (writes pi's override entry from the record; refuses when the user-level
   server it overrides no longer exists — an override without a definition would be an invalid entry —
   when the project file has any own value that is not an override object, or when it holds an override
@@ -193,7 +197,7 @@ relax a rule.
   `MCP_CONFIRM_CHAT`, `createMcpEngine` (`{ loadConfig, lockSignIns?, openUrl?, onCommandSettled? }`), `acquireMcpSignInLock`,
   `loadHostMcpConfig` + `McpProjectPolicy` + `mcpPolicyOf`, `summarizeMcpServers`, `maskMcpEndpoint` /
   `redactMcpText`, `readMcpServerLog`, `effectiveMcpServerConfig`, the `management.ts` mutations (`writeMcpServerEntry`,
-  `removeMcpServerEntry`, `projectMcpEntryFingerprint`, `shareMcpOverrideWithRepo`),
+  `removeMcpServerEntry`, `mcpEntryFingerprint`, `shareMcpOverrideWithRepo`),
   `summarizeMcpConfigErrors`, the status parsers (`parseMcpStatusText`, `parseMcpAttentionNotice`,
   `MCP_ATTENTION_PREFIX`, `deriveMcpServerStatuses`, `ParsedMcpStatus`), `summarizeMcpResult` /
   `isMcpResultTool` / `MCP_SUMMARY_BYTES`, and the types `LoadedMcpFiles`,
