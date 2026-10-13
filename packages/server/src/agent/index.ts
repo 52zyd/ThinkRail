@@ -24,7 +24,35 @@ export {
 	registerBundledRuntime,
 	setDisabledExtensionsResolver,
 } from "./extensions";
-export { mcpPolicyOf } from "./mcp";
+export {
+	effectiveMcpServerConfig,
+	mcpPolicyOf,
+	projectMcpEntryFingerprint,
+	readMcpServerLog,
+	removeMcpServerEntry,
+	shareMcpOverrideWithRepo,
+	writeMcpServerEntry,
+} from "./mcp";
+export {
+	listMcpServers,
+	mcpOwnershipGuard,
+	readMcpToolOutput,
+	reconcileMcpSessions,
+	reconnectMcpServer,
+	refreshMcpStatus,
+	setMcpStatusPublisher,
+	watchUserMcpConfig,
+} from "./mcpSessions";
+export {
+	cancelAllMcpProbes,
+	cancelMcpProbe,
+	cancelMcpProbesOwnedBy,
+	isMcpLoginId,
+	type McpProbeAction,
+	replyMcpProbe,
+	setMcpLoginPublisher,
+	startMcpProbe,
+} from "./mcpSignIn";
 export {
 	listModelContextSettings,
 	setModelContextPublisher,

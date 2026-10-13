@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+	approveProjectMcpServer,
 	closeProject,
 	getProjects,
 	initProject,
@@ -20,6 +21,7 @@ import {
 	listRecentProjects,
 	openProject,
 	setPiTrustSeed,
+	setProjectMcpOverride,
 	setProjectPublisher,
 	setProjectTrust,
 } from "./projects";
@@ -371,4 +373,35 @@ test("a newly added project starts untrusted unless pi already trusts its path",
 	expect(openProject(plain).piResourceTrust).toBe("untrusted");
 	expect(openProject(piTrusted).piResourceTrust).toBe("granted");
 	expect(initProject(plain).piResourceTrust).toBe("untrusted");
+});
+
+test("MCP approvals and per-project overrides persist in the project record and clear cleanly", () => {
+	const repo = join(dataDir, "repo");
+	makeRepo(repo);
+	const project = openProject(repo);
+
+	approveProjectMcpServer(project.id, "linear", "fp-1");
+	expect(approveProjectMcpServer(project.id, "linear", "fp-2").mcpApprovals).toEqual({
+		linear: "fp-2",
+	});
+
+	const before = readFileSync(join(dataDir, "projects.json"), "utf8");
+	expect(setProjectMcpOverride(project.id, "missing", {}).mcpOverrides).toBeUndefined();
+	expect(readFileSync(join(dataDir, "projects.json"), "utf8")).toBe(before);
+	setProjectMcpOverride(project.id, "context7", { enabled: false });
+	const exposed = setProjectMcpOverride(project.id, "sentry", { exposure: "direct" });
+	expect(exposed.mcpOverrides).toEqual({
+		context7: { enabled: false },
+		sentry: { exposure: "direct" },
+	});
+	setProjectMcpOverride(project.id, "context7", { exposure: "hidden" });
+	expect(setProjectMcpOverride(project.id, "context7", {}).mcpOverrides?.context7).toEqual({
+		enabled: false,
+		exposure: "hidden",
+	});
+	setProjectMcpOverride(project.id, "context7", null);
+	const cleared = setProjectMcpOverride(project.id, "sentry", null);
+	expect(cleared.mcpOverrides).toBeUndefined();
+	expect(storedProjects()[0]).not.toHaveProperty("mcpOverrides");
+	expect(() => approveProjectMcpServer("nope", "x", "y")).toThrow();
 });

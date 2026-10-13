@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { rmSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, isAbsolute, join, resolve } from "node:path";
-import type { Project, ProjectPathStatus } from "@thinkrail/contracts";
+import type { McpProjectOverride, Project, ProjectPathStatus } from "@thinkrail/contracts";
 import { CodedError } from "@thinkrail/shared/codedError";
 import { canonicalPath, git } from "../git";
 import { loadProjects, loadWorkspaces, saveProjects } from "../persistence";
@@ -151,6 +151,62 @@ export function setProjectTrust(
 	if (acknowledgedSkills !== undefined) project.acknowledgedSkills = acknowledgedSkills;
 	saveProjects(projects);
 	emit(project);
+	return project;
+}
+
+export function approveProjectMcpServer(id: string, name: string, fingerprint: string): Project {
+	const projects = getProjects();
+	const project = projects.find((p) => p.id === id);
+	if (!project) throw new Error(`Unknown project: ${id}`);
+	project.mcpApprovals = { ...project.mcpApprovals, [name]: fingerprint };
+	saveProjects(projects);
+	return project;
+}
+
+export function setProjectMcpOverride(
+	id: string,
+	name: string,
+	patch: McpProjectOverride | null,
+): Project {
+	if (patch !== null) {
+		if (patch.enabled !== undefined && typeof patch.enabled !== "boolean") {
+			throw new CodedError("MCP_CONFIG_INVALID", "MCP server enabled must be a boolean");
+		}
+		if (
+			patch.exposure !== undefined &&
+			patch.exposure !== "deferred" &&
+			patch.exposure !== "direct" &&
+			patch.exposure !== "hidden"
+		) {
+			throw new CodedError(
+				"MCP_CONFIG_INVALID",
+				"MCP server exposure must be deferred, direct or hidden",
+			);
+		}
+	}
+	const projects = getProjects();
+	const project = projects.find((p) => p.id === id);
+	if (!project) throw new Error(`Unknown project: ${id}`);
+	const overrides: Record<string, McpProjectOverride> = { ...project.mcpOverrides };
+	if (patch === null) {
+		delete overrides[name];
+	} else {
+		if (patch.enabled === undefined && patch.exposure === undefined) return project;
+		const override = {
+			...(Object.hasOwn(overrides, name) ? overrides[name] : {}),
+			...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+			...(patch.exposure !== undefined ? { exposure: patch.exposure } : {}),
+		};
+		Object.defineProperty(overrides, name, {
+			value: override,
+			enumerable: true,
+			configurable: true,
+			writable: true,
+		});
+	}
+	if (Object.keys(overrides).length === 0) delete project.mcpOverrides;
+	else project.mcpOverrides = overrides;
+	saveProjects(projects);
 	return project;
 }
 

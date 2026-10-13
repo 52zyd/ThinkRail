@@ -1,14 +1,32 @@
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	lstatSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	readlinkSync,
+	rmSync,
+	statSync,
+	symlinkSync,
+	writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { LoadedMcpConfig } from "@earendil-works/pi-coding-agent";
 import {
+	addMcpServerConfig,
+	assertProjectMcpConfigWritable,
 	fingerprintMcpEntry,
 	loadHostMcpConfig,
 	loadMcpConfigFiles,
+	McpConfigPathUnsafeError,
 	normalizeExposureForHost,
+	removeMcpServerConfig,
+	updateMcpServerConfig,
 	validateMcpServerConfig,
 } from "./index";
 
@@ -111,6 +129,25 @@ const PARITY_CASES: { name: string; global: unknown; project?: unknown }[] = [
 				local: { command: "./bin/server", cwd: "tools" },
 			},
 			autoEnableCodemode: false,
+		},
+	},
+	{
+		name: "invalid project override fields leave the global definition intact",
+		global: {
+			mcpServers: {
+				enabled: { command: "unused" },
+				exposure: { url: "https://docs.example/mcp" },
+				tools: { command: "unused" },
+				extra: { command: "unused" },
+			},
+		},
+		project: {
+			mcpServers: {
+				enabled: { enabled: "false" },
+				exposure: { exposure: "invalid" },
+				tools: { toolExposure: { read: "invalid" } },
+				extra: { enabled: false, headers: {} },
+			},
 		},
 	},
 	{
@@ -236,7 +273,7 @@ test("the host loader admits repo entries only at their approved fingerprint and
 		},
 		{ mcpServers: { repo: repoServer, linear: repoOverride } },
 	);
-	const load = (approvals: Record<string, string>) =>
+	const load = (approvals: Record<string, string>, disabledInChat?: Set<string>) =>
 		loadHostMcpConfig({
 			agentDir,
 			cwd,
@@ -249,6 +286,7 @@ test("the host loader admits repo entries only at their approved fingerprint and
 					repo: { enabled: false },
 				},
 			},
+			...(disabledInChat ? { disabledInChat } : {}),
 		});
 	const byName = (loaded: ReturnType<typeof load>) =>
 		Object.fromEntries(loaded.servers.map((server) => [server.name, server]));
@@ -264,11 +302,12 @@ test("the host loader admits repo entries only at their approved fingerprint and
 		repo: fingerprintMcpEntry("repo", repoServer),
 		linear: fingerprintMcpEntry("linear", repoOverride),
 	};
-	const approved = byName(load(approvals));
+	const approved = byName(load(approvals, new Set(["quiet"])));
 	expect(approved.repo?.scope).toBe("project");
 	expect(approved.repo?.config.enabled).toBeUndefined();
 	expect(approved.repo?.config.exposure).toBe("deferred");
 	expect(approved.linear?.config.exposure).toBe("direct");
+	expect(approved.quiet?.config.enabled).toBe(false);
 
 	const changed = byName(
 		load({
@@ -278,4 +317,169 @@ test("the host loader admits repo entries only at their approved fingerprint and
 	);
 	expect(changed.repo).toBeUndefined();
 	expect(load(approvals).entries.filter((entry) => entry.scope === "project")).toHaveLength(2);
+});
+
+test("writers keep unknown keys and indentation, drop global defaults, and replace the file atomically", () => {
+	const dir = join(root, "writers");
+	mkdirSync(dir, { recursive: true });
+	const path = join(dir, "mcp.json");
+	writeFileSync(path, '{\n    "extra": true,\n    "mcpServers": {}\n}\n');
+	chmodSync(path, 0o600);
+	expect(addMcpServerConfig(path, "a", { url: "https://a/mcp" })).toBe(false);
+	expect(addMcpServerConfig(path, "a", { url: "https://a2/mcp" })).toBe(true);
+	updateMcpServerConfig(path, "a", { enabled: false, exposure: "direct" });
+	updateMcpServerConfig(path, "a", { enabled: true, exposure: "codemode" });
+	const text = readFileSync(path, "utf8");
+	expect(text.startsWith('{\n    "extra": true,')).toBe(true);
+	expect(JSON.parse(text)).toEqual({ extra: true, mcpServers: { a: { url: "https://a2/mcp" } } });
+	expect(statSync(path).mode & 0o777).toBe(0o600);
+	expect(removeMcpServerConfig(path, "missing")).toBe(false);
+	expect(removeMcpServerConfig(path, "a")).toBe(true);
+	expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ extra: true, mcpServers: {} });
+
+	expect(removeMcpServerConfig(path, "__proto__")).toBe(false);
+	expect(addMcpServerConfig(path, "__proto__", { url: "https://p/mcp" })).toBe(false);
+	expect(readFileSync(path, "utf8")).toContain('"__proto__": {');
+	updateMcpServerConfig(path, "__proto__", { enabled: false });
+	const proto = JSON.parse(readFileSync(path, "utf8")).mcpServers;
+	expect(Object.hasOwn(proto, "__proto__")).toBe(true);
+	expect(Object.getOwnPropertyDescriptor(proto, "__proto__")?.value).toEqual({
+		url: "https://p/mcp",
+		enabled: false,
+	});
+	expect(removeMcpServerConfig(path, "__proto__")).toBe(true);
+	expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({ extra: true, mcpServers: {} });
+});
+
+test("an override entry keeps explicit values instead of dropping defaults", () => {
+	const path = join(root, "override", ".pi", "mcp.json");
+	updateMcpServerConfig(
+		path,
+		"linear",
+		{ enabled: true, exposure: "codemode" },
+		{ override: true },
+	);
+	expect(JSON.parse(readFileSync(path, "utf8"))).toEqual({
+		mcpServers: { linear: { enabled: true, exposure: "codemode" } },
+	});
+});
+
+test("project config writes refuse symlinked .pi directories and files, and paths outside the worktree", () => {
+	const worktree = join(root, "containment", "wt");
+	const elsewhere = join(root, "containment", "elsewhere");
+	mkdirSync(join(elsewhere, "pi"), { recursive: true });
+	mkdirSync(worktree, { recursive: true });
+	symlinkSync(join(elsewhere, "pi"), join(worktree, ".pi"));
+	expect(() => assertProjectMcpConfigWritable(worktree, join(worktree, ".pi", "mcp.json"))).toThrow(
+		McpConfigPathUnsafeError,
+	);
+	rmSync(join(worktree, ".pi"));
+	mkdirSync(join(worktree, ".pi"));
+	writeFileSync(join(elsewhere, "secrets.json"), "{}");
+	symlinkSync(join(elsewhere, "secrets.json"), join(worktree, ".pi", "mcp.json"));
+	expect(() => assertProjectMcpConfigWritable(worktree, join(worktree, ".pi", "mcp.json"))).toThrow(
+		/non-regular/,
+	);
+	expect(() => assertProjectMcpConfigWritable(worktree, join(elsewhere, "mcp.json"))).toThrow(
+		/outside the worktree/,
+	);
+	rmSync(join(worktree, ".pi", "mcp.json"));
+	expect(() =>
+		assertProjectMcpConfigWritable(worktree, join(worktree, ".pi", "mcp.json")),
+	).not.toThrow();
+});
+
+for (const linkKind of ["absolute", "relative", "chain"]) {
+	test(`writers preserve a user config's ${linkKind} symlink and atomically replace its private target`, () => {
+		const dir = join(root, `symlink-${linkKind}`);
+		const targetDir = join(dir, "private");
+		const agentDir = join(dir, "agent");
+		mkdirSync(targetDir, { recursive: true });
+		mkdirSync(agentDir);
+		const target = join(targetDir, "config.json");
+		const path = join(agentDir, "mcp.json");
+		writeFileSync(target, '{\n\t"extra": true,\n\t"mcpServers": {}\n}\n');
+		chmodSync(target, 0o600);
+		const link = linkKind === "absolute" ? target : relative(agentDir, target);
+		if (linkKind === "chain") symlinkSync(link, join(agentDir, "intermediate.json"));
+		const linkText = linkKind === "chain" ? "intermediate.json" : link;
+		symlinkSync(linkText, path);
+		const linkInode = lstatSync(path).ino;
+		const assertLink = (previousInode: number) => {
+			expect(lstatSync(path).isSymbolicLink()).toBe(true);
+			expect(lstatSync(path).ino).toBe(linkInode);
+			expect(readlinkSync(path)).toBe(linkText);
+			expect(statSync(target).mode & 0o777).toBe(0o600);
+			expect(statSync(target).ino).not.toBe(previousInode);
+			expect(readFileSync(path, "utf8")).toBe(readFileSync(target, "utf8"));
+			expect(readFileSync(target, "utf8").startsWith('{\n\t"extra": true,')).toBe(true);
+			expect(readdirSync(targetDir)).toEqual(["config.json"]);
+		};
+		let before = statSync(target).ino;
+		expect(addMcpServerConfig(path, "docs", { url: "https://docs.example/mcp" })).toBe(false);
+		assertLink(before);
+		before = statSync(target).ino;
+		updateMcpServerConfig(path, "docs", { enabled: false });
+		assertLink(before);
+		expect(JSON.parse(readFileSync(target, "utf8")).mcpServers.docs.enabled).toBe(false);
+		before = statSync(target).ino;
+		expect(removeMcpServerConfig(path, "docs")).toBe(true);
+		assertLink(before);
+		expect(JSON.parse(readFileSync(target, "utf8"))).toEqual({ extra: true, mcpServers: {} });
+	});
+}
+
+test("writers leave dangling, looping, directory and malformed user config symlinks untouched on errors", () => {
+	const dir = join(root, "symlink-errors");
+	mkdirSync(dir);
+	const missing = join(dir, "missing.json");
+	const dangling = join(dir, "dangling.json");
+	const loop = join(dir, "loop.json");
+	const directory = join(dir, "directory.json");
+	const malformed = join(dir, "malformed.json");
+	const broken = join(dir, "broken.json");
+	symlinkSync("missing.json", dangling);
+	symlinkSync("loop.json", loop);
+	symlinkSync(".", directory);
+	writeFileSync(broken, "{ invalid json");
+	chmodSync(broken, 0o600);
+	symlinkSync("broken.json", malformed);
+	const files = readdirSync(dir);
+	for (const path of [dangling, loop, directory, malformed]) {
+		const link = readlinkSync(path);
+		expect(() => addMcpServerConfig(path, "docs", { command: "unused" })).toThrow();
+		expect(() => updateMcpServerConfig(path, "docs", { enabled: false })).toThrow();
+		expect(() => removeMcpServerConfig(path, "docs")).toThrow();
+		expect(readlinkSync(path)).toBe(link);
+		expect(lstatSync(path).isSymbolicLink()).toBe(true);
+	}
+	expect(existsSync(missing)).toBe(false);
+	expect(readFileSync(broken, "utf8")).toBe("{ invalid json");
+	expect(statSync(broken).mode & 0o777).toBe(0o600);
+	expect(readdirSync(dir)).toEqual(files);
+});
+
+test("an approved invalid project entry cannot replace the valid effective user config", () => {
+	const invalid = { url: "https://project.example/mcp", enabled: "false" };
+	const { agentDir, cwd } = fixture(
+		{ mcpServers: { docs: { command: "unused-test-server", exposure: "direct" } } },
+		{ mcpServers: { docs: invalid } },
+	);
+	const loaded = loadHostMcpConfig({
+		agentDir,
+		cwd,
+		projectTrusted: true,
+		policy: { approvals: { docs: fingerprintMcpEntry("docs", invalid) }, overrides: {} },
+	});
+	expect(loaded.servers).toEqual([
+		{
+			name: "docs",
+			source: join(agentDir, "mcp.json"),
+			scope: "global",
+			config: { command: "unused-test-server", exposure: "direct" },
+		},
+	]);
+	expect(loaded.errors).toEqual([
+		`${join(cwd, ".pi", "mcp.json")}: server "docs": enabled must be a boolean`,
+	]);
 });

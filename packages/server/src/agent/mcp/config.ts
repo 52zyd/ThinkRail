@@ -32,14 +32,6 @@ export function mcpNamespace(server: string): string {
 	return `mcp__${server.replace(/-/g, "_")}`;
 }
 
-function toolPatternRegExp(pattern: string): RegExp {
-	const source = pattern
-		.split("*")
-		.map((part) => part.replace(/[.+?^${}()|[\]\\]/g, "\\$&"))
-		.join(".*");
-	return new RegExp(`^${source}$`);
-}
-
 export function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -145,16 +137,6 @@ function resolveExposureAliases(value: Record<string, unknown>): Record<string, 
 		);
 	}
 	return resolved;
-}
-
-export function getMcpToolExposure(config: McpServerConfig, toolName: string): McpExposure {
-	const overrides = config.toolExposure ?? {};
-	const exact = overrides[toolName];
-	if (exact !== undefined) return exact;
-	for (const [pattern, exposure] of Object.entries(overrides)) {
-		if (pattern.includes("*") && toolPatternRegExp(pattern).test(toolName)) return exposure;
-	}
-	return config.exposure ?? "codemode";
 }
 
 export function validateMcpServerConfig(name: string, raw: unknown): McpServerConfig | string {
@@ -396,10 +378,17 @@ export interface McpProjectPolicy {
 	overrides: Readonly<Record<string, McpProjectOverride>>;
 }
 
+// Null-prototype copies, so a server named `__proto__` never reads Object.prototype as its policy.
+const ownEntries = <T>(record: Record<string, T> | undefined): Record<string, T> =>
+	Object.assign(Object.create(null) as Record<string, T>, record);
+
 export function mcpPolicyOf(
 	project: Pick<Project, "mcpApprovals" | "mcpOverrides"> | undefined,
 ): McpProjectPolicy {
-	return { approvals: project?.mcpApprovals ?? {}, overrides: project?.mcpOverrides ?? {} };
+	return {
+		approvals: ownEntries(project?.mcpApprovals),
+		overrides: ownEntries(project?.mcpOverrides),
+	};
 }
 
 export function loadHostMcpConfig(options: {
@@ -407,8 +396,9 @@ export function loadHostMcpConfig(options: {
 	cwd: string;
 	projectTrusted: boolean;
 	policy: McpProjectPolicy;
+	disabledInChat?: ReadonlySet<string>;
 }): LoadedMcpFiles {
-	const { policy } = options;
+	const { policy, disabledInChat } = options;
 	const loaded = loadMcpConfigFiles({
 		agentDir: options.agentDir,
 		cwd: options.cwd,
@@ -421,6 +411,7 @@ export function loadHostMcpConfig(options: {
 		const config: McpServerConfig = { ...server.config };
 		if (override?.enabled !== undefined) config.enabled = override.enabled;
 		if (override?.exposure !== undefined) config.exposure = override.exposure;
+		if (disabledInChat?.has(server.name)) config.enabled = false;
 		return { ...server, config: normalizeExposureForHost(config) };
 	});
 	return { ...loaded, servers };

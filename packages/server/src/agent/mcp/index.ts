@@ -1,6 +1,5 @@
 export {
 	fingerprintMcpEntry,
-	getMcpToolExposure,
 	globalMcpConfigPath,
 	isOverrideEntry,
 	type LoadedMcpFiles,
@@ -16,6 +15,15 @@ export {
 	validateMcpServerConfig,
 } from "./config";
 export { createMcpEngine } from "./engine";
+export { readMcpServerLog } from "./log";
+export {
+	effectiveMcpServerConfig,
+	projectMcpEntryFingerprint,
+	removeMcpServerEntry,
+	shareMcpOverrideWithRepo,
+	writeMcpServerEntry,
+} from "./management";
+export { maskMcpEndpoint, redactMcpText } from "./redact";
 export {
 	isMcpResultTool,
 	MCP_SUMMARY_BYTES,
@@ -28,3 +36,20 @@ export {
 	MCP_CONFIRM_ONCE,
 	type McpSessionHost,
 } from "./sessionHost";
+export { acquireMcpSignInLock } from "./signInLock";
+export {
+	deriveMcpServerStatuses,
+	MCP_ATTENTION_PREFIX,
+	type ParsedMcpStatus,
+	parseMcpAttentionNotice,
+	parseMcpStatusText,
+} from "./status";
+export { summarizeMcpConfigErrors, summarizeMcpServers } from "./summaries";
+export {
+	addMcpServerConfig,
+	assertProjectMcpConfigWritable,
+	McpConfigPathUnsafeError,
+	type McpServerConfigPatch,
+	removeMcpServerConfig,
+	updateMcpServerConfig,
+} from "./writers";
