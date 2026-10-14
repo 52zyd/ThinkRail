@@ -679,6 +679,20 @@ export function selectActiveEditorTab(
 	return (state.tabsByWorkspace[workspaceId] ?? []).find((tab) => tab.id === activeId) ?? null;
 }
 
+export function selectWorkspaceChatTab(
+	state: {
+		tabsByWorkspace: Record<string, EditorTab[]>;
+		activeTabByWorkspace: Record<string, string | null>;
+	},
+	workspaceId: string,
+): Extract<EditorTab, { kind: "chat" }> | null {
+	const tabs = state.tabsByWorkspace[workspaceId] ?? [];
+	const active = selectActiveEditorTab(state, workspaceId);
+	if (active?.kind === "chat") return active;
+	const fallback = tabs.findLast((t) => t.kind === "chat");
+	return fallback?.kind === "chat" ? fallback : null;
+}
+
 export function selectHistoryTarget(state: {
 	activeWorkspaceId: string | null;
 	tabsByWorkspace: Record<string, EditorTab[]>;
@@ -686,10 +700,18 @@ export function selectHistoryTarget(state: {
 }): HistoryTarget | null {
 	const workspaceId = state.activeWorkspaceId;
 	if (!workspaceId) return null;
-	const tabs = state.tabsByWorkspace[workspaceId] ?? [];
-	const active = selectActiveEditorTab(state, workspaceId);
-	const chat = active?.kind === "chat" ? active : tabs.findLast((t) => t.kind === "chat");
+	const chat = selectWorkspaceChatTab(state, workspaceId);
 	return chat ? { workspaceId, tabId: chat.id, sessionId: chat.sessionId } : null;
+}
+
+export function selectRailPlanSessionId(
+	state: {
+		tabsByWorkspace: Record<string, EditorTab[]>;
+		activeTabByWorkspace: Record<string, string | null>;
+	},
+	workspaceId: string,
+): string | null {
+	return selectWorkspaceChatTab(state, workspaceId)?.sessionId ?? null;
 }
 
 export interface KnownChatLocation {

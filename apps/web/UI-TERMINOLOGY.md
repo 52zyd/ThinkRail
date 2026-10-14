@@ -199,7 +199,7 @@ The agent conversation, rendered inside a Chat tab in the Center Tabbed Area.
 - **Position:** Fills the Editor Pane. Vertically: Chat Header (top) → Message List (middle, scrolls) →
   Composer (bottom).
 - **Responsibility:** render pi's canonical message / content-block model as folded rows; own the
-  composer, history overlay, plan popover, and dialogs.
+  composer, history overlay, and dialogs.
 
 ## Chat Header
 
@@ -208,8 +208,6 @@ The agent conversation, rendered inside a Chat tab in the Center Tabbed Area.
 - **Parent:** Chat View.
 - **Position:** Slim top bar of the Chat View.
 - **Children / slots:**
-  - **Plan Strip** — `ChatPlanStripContent` (from `chat/ChatPlan.tsx`), passed into the header's `left`
-    slot; opens the **Plan Popover** (`ChatPlanContent`) over the chat.
   - **Status Entries** — inline muted `statusEntries` text (extension status).
   - **Session Stats Bar** — `chat/SessionStatsBar.tsx` → `SessionStatsBar` (token/cost stats).
   - **Resources Trigger** — `chat/resources/ResourcesButton.tsx` → `ResourcesButton`
@@ -333,11 +331,12 @@ Children / associated surfaces:
 ## Chat Plan (TODO plan)
 
 - **Canonical name:** Chat Plan.
-- **Implementation:** `chat/ChatPlan.tsx` (`ChatPlanStripContent` = the Plan Strip in the Chat Header;
-  `ChatPlanContent` = the Plan Popover body) + `chat/TodoList.tsx` → `TodoList`.
-- **Parent:** Chat Header (strip) → Popover (body).
-- **Responsibility:** surface the chat's `pi-todos` plan (group-first, status-ordered). There is no
-  side-tool Todo tab — the plan lives in the conversation.
+- **Implementation:** `chat/TodoList.tsx` → `TodoList` + `panels/PlanRailPane.tsx` → `PlanRailPane`
+  (rail body) + `panels/PlanPane.tsx` → `PlanPane` (center-tab page, opened via `openPlan`).
+- **Parent:** Right side-rail tool (`plan`) for the compact TODO list; center editor tab for the
+  document-scale Plan page.
+- **Responsibility:** surface the chat's `pi-todos` plan (group-first, status-ordered). The TODO list
+  is a side-rail tool next to Files / Specs / Changes / Review.
 
 ---
 
@@ -590,7 +589,7 @@ its alternatives in parentheses.
 **Chat**
 
 - **Chat View** — the whole conversation surface.
-- **Chat Header** — its top bar. **Plan Strip**, **Session Stats Bar**, **Resources Trigger**, **Skills Button**.
+- **Chat Header** — its top bar. **Session Stats Bar**, **Resources Trigger**, **Skills Button**.
 - **Resources** — **Resources Trigger**, **Resources Dock**, **Resources Inspector**, **Resource Row**,
   **Command Log View**, **Subagent Transcript Pane**, **Stop-All Action**, **Still-Running Chip**.
 - **Message List** (alt: Transcript). Units: **Turn** (pi message), **Row** (derived render unit).
@@ -604,7 +603,7 @@ its alternatives in parentheses.
   **Send Button**, **History-Open Button**, **Slot Hint Chip**.
 - **History Overlay** — **Results List**, **Preview Pane**, **Scope Picker**, **Jump Action**,
   **Save-as-Template Action**.
-- **Chat Plan** — **Plan Strip** + **Plan Popover** + **Todo List**.
+- **Chat Plan** — **TODO List** (right-rail tool, `PlanRailPane`) + **Plan Page** (center-tab, `PlanPane`, opened via `openPlan`).
 
 **Changes review**
 

@@ -597,9 +597,7 @@ const handlers: WsHandlers = {
 		if (p.status === "done") await observeCompletion();
 		return result;
 	},
-	"todo.remove": (p) => {
-		return removeTodo(p, () => isItemUnderActiveReview(p.sessionId, p.id));
-	},
+	"todo.remove": (p) => removeTodo(p, () => isItemUnderActiveReview(p.sessionId, p.id)),
 	"todo.review": (params) => {
 		const capture = additionalCapture();
 		const result = approveTodoReview(params);

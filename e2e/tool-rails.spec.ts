@@ -4,7 +4,9 @@ import {
 	defaultWorkspaceRow,
 	enterDefaultWorkspace,
 	openFixtureProject,
+	openWorkspaceChat,
 	pressPlatformShortcut,
+	revealWorkbenchTool,
 	waitTerminalReady,
 	worktreeRow,
 } from "./fixtures/app";
@@ -220,7 +222,7 @@ async function finishDrag(page: Page, target: Locator): Promise<void> {
 	await page.mouse.up();
 }
 
-test("rail clusters mirror the panes, boundary drops create panes, and tools never join a terminal pane", async ({
+test("rail clusters include unplaced tools, boundary drops create panes, and tools never join a terminal pane", async ({
 	page,
 }) => {
 	await openDefaultWorkbench(page);
@@ -229,6 +231,7 @@ test("rail clusters mirror the panes, boundary drops create panes, and tools nev
 	expect(await railClusters(page, "right-layout-rail")).toEqual([
 		["tool-rail-specs", "tool-rail-files"],
 		["tool-rail-changes", "tool-rail-review"],
+		["tool-rail-plan"],
 	]);
 
 	await startDrag(page, page.getByTestId("tool-rail-files"));
@@ -242,6 +245,7 @@ test("rail clusters mirror the panes, boundary drops create panes, and tools nev
 		["tool-rail-specs"],
 		["tool-rail-files"],
 		["tool-rail-changes", "tool-rail-review"],
+		["tool-rail-plan"],
 	]);
 
 	await startDrag(page, page.getByTestId("tool-rail-files"));
@@ -251,6 +255,7 @@ test("rail clusters mirror the panes, boundary drops create panes, and tools nev
 		["tool-rail-specs"],
 		["empty-rail-group"],
 		["tool-rail-changes", "tool-rail-review", "tool-rail-files"],
+		["tool-rail-plan"],
 	]);
 	await expect(page.locator('[data-side="right"][data-group-id]')).toHaveCount(3);
 
@@ -269,11 +274,34 @@ test("rail clusters mirror the panes, boundary drops create panes, and tools nev
 		["tool-rail-specs"],
 		["empty-rail-group"],
 		["tool-rail-changes"],
-		["tool-rail-review"],
+		["tool-rail-review", "tool-rail-plan"],
 	]);
 	await expect(page.getByTestId("tool-rail-review")).toHaveClass(/text-text-subtle/);
 	await page.getByTestId("tool-rail-review").click();
 	await expect(page.getByTestId("tool-rail-review")).toHaveAttribute("aria-pressed", "true");
+});
+
+test("the plan rail entry is an idempotent toggler \u2014 one click opens, another closes, revealWorkbenchTool is a no-op when already open", async ({
+	page,
+}) => {
+	await openWorkspaceChat(page);
+	const plan = page.getByTestId("tool-rail-plan");
+	await expect(plan).toBeVisible();
+	await expect(plan).toHaveAttribute("aria-pressed", "false");
+	await expect(page.getByTestId("plan-rail-pane")).toHaveCount(0);
+
+	await plan.click();
+	await expect(plan).toHaveAttribute("aria-pressed", "true");
+	await expect(page.getByTestId("plan-rail-pane")).toBeVisible();
+
+	await plan.click();
+	await expect(plan).toHaveAttribute("aria-pressed", "false");
+	await expect(page.getByTestId("plan-rail-pane")).toHaveCount(0);
+
+	await revealWorkbenchTool(page, "plan");
+	await revealWorkbenchTool(page, "plan");
+	await expect(plan).toHaveAttribute("aria-pressed", "true");
+	await expect(page.getByTestId("plan-rail-pane")).toBeVisible();
 });
 
 test("rail keyboard navigation changes focus without selection and keeps collapsed panels linked", async ({
@@ -304,6 +332,36 @@ test("rail keyboard navigation changes focus without selection and keeps collaps
 	await expect(page.getByTestId("changes-view-toggle")).toBeVisible();
 	await page.keyboard.press("Enter");
 	await expect(panel).toBeVisible();
+	await expect(rail.locator('[data-rail-entry][tabindex="0"]')).toHaveCount(1);
+});
+
+test("the plan rail entry is reachable by keyboard, exposes aria-controls, and labels its panel", async ({
+	page,
+}) => {
+	await openWorkspaceChat(page);
+	const rail = page.getByTestId("right-layout-rail");
+	const plan = page.getByTestId("tool-rail-plan");
+	await expect(plan).toBeVisible();
+	await expect(plan).toHaveAttribute("aria-pressed", "false");
+
+	await page.getByTestId("tool-rail-specs").focus();
+	for (let i = 0; i < 10 && !(await plan.evaluate((el) => el === document.activeElement)); i += 1) {
+		await page.keyboard.press("ArrowDown");
+	}
+	await expect(plan).toBeFocused();
+
+	await page.keyboard.press("Enter");
+	await expect(plan).toHaveAttribute("aria-pressed", "true");
+	const panelId = await plan.getAttribute("aria-controls");
+	if (!panelId) throw new Error("Plan rail control has no panel relationship");
+	const panel = page.locator(`[id="${panelId}"]`);
+	await expect(panel).toBeVisible();
+	await expect(panel).toContainText("No TODOs yet");
+	await expect(panel).toHaveAttribute("aria-labelledby", (await plan.getAttribute("id")) ?? "");
+
+	await page.keyboard.press("Space");
+	await expect(plan).toHaveAttribute("aria-pressed", "false");
+	await expect(panel).toBeHidden();
 	await expect(rail.locator('[data-rail-entry][tabindex="0"]')).toHaveCount(1);
 });
 

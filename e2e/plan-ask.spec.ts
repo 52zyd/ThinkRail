@@ -7,11 +7,65 @@ import {
 	hideAuxiliaryWorkbench,
 	openFixtureProject,
 	openPersistedChat,
+	revealWorkbenchTool,
 } from "./fixtures/app";
 import { E2E_FIXTURE_REPO } from "./fixtures/paths";
 import { seedWorkspaceSession } from "./fixtures/sessions";
 
 const BASE_TS = 1_700_800_000_000;
+
+test("a pending ask surfaces on the rail as waiting_question glance, not paused", async ({
+	page,
+}) => {
+	await openFixtureProject(page);
+	const askArgs: AskUserQuestionArgs = {
+		questions: [
+			{
+				question: "Is this blocking?",
+				header: "Blocking",
+				options: [
+					{ label: "Yes", description: "stop and ask" },
+					{ label: "No", description: "keep going" },
+				],
+			},
+		],
+	};
+	const ack: AskUserQuestionAckDetails = { kind: "ack" };
+	const session = seedWorkspaceSession(realpathSync(E2E_FIXTURE_REPO), {
+		name: "rail glance on pending ask",
+		messages: [
+			{ role: "user", text: "Ping.", timestamp: BASE_TS },
+			{
+				role: "assistant",
+				content: [
+					{ type: "toolCall", id: "ask-rail", name: "ask_user_question", arguments: askArgs },
+				],
+				stopReason: "toolUse",
+				timestamp: BASE_TS + 1000,
+			},
+			{
+				role: "toolResult",
+				toolCallId: "ask-rail",
+				toolName: "ask_user_question",
+				content: [{ type: "text", text: "awaiting" }],
+				details: ack,
+				isError: false,
+				timestamp: BASE_TS + 2000,
+			},
+		],
+	});
+	try {
+		await enterDefaultWorkspace(page);
+		await hideAuxiliaryWorkbench(page);
+		await openPersistedChat(page, "rail glance on pending ask");
+		await revealWorkbenchTool(page, "plan");
+		const rail = page.getByTestId("plan-rail-pane");
+		await expect(rail).toBeVisible();
+		await expect(rail).toHaveAttribute("data-glance", "waiting_question");
+	} finally {
+		rmSync(session.path, { force: true });
+	}
+});
 
 test("a pending ask_user_question is answerable from the plan page", async ({ page }) => {
 	await openFixtureProject(page);
@@ -53,8 +107,8 @@ test("a pending ask_user_question is answerable from the plan page", async ({ pa
 		await enterDefaultWorkspace(page);
 		await hideAuxiliaryWorkbench(page);
 		await openPersistedChat(page, "plan ask question");
-		await page.getByTestId("chat-plan-toggle").click();
-		await page.getByTestId("chat-plan-popover").getByTestId("todo-open-plan").click();
+		await revealWorkbenchTool(page, "plan");
+		await page.getByTestId("plan-rail-pane").getByTestId("todo-open-plan").click();
 		const pane = page.getByTestId("plan-pane");
 		await expect(pane).toBeVisible();
 		const card = pane.getByTestId("plan-ask");
@@ -113,8 +167,8 @@ test("the plan shows the agent's latest message when it isn't asking or on a ste
 		await enterDefaultWorkspace(page);
 		await hideAuxiliaryWorkbench(page);
 		await openPersistedChat(page, "agent activity");
-		await page.getByTestId("chat-plan-toggle").click();
-		await page.getByTestId("chat-plan-popover").getByTestId("todo-open-plan").click();
+		await revealWorkbenchTool(page, "plan");
+		await page.getByTestId("plan-rail-pane").getByTestId("todo-open-plan").click();
 		const pane = page.getByTestId("plan-pane");
 		await expect(pane).toBeVisible();
 		await expect(pane.getByTestId("plan-agent-message")).toContainText("day_of_visit avalanche");

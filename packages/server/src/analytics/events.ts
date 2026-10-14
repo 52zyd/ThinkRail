@@ -19,8 +19,8 @@ export interface ProviderAnalyticsProperties {
 
 export type SendMode = "prompt" | "steer" | "follow_up";
 
-export type PlanOpenSurface = "page" | "popup";
-export type PlanAddSurface = "chat" | "page";
+export type PlanOpenSurface = "page" | "rail";
+export type PlanAddSurface = "chat" | "page" | "rail";
 export type PlanActionSource = "plan_page" | "other";
 
 export type ReviewCommentActor = "user" | "agent";

@@ -246,7 +246,7 @@ function editorResourceIdentity(tab: EditorTab): string {
 	return layoutResourceIdentity(tab);
 }
 
-function editorSessionId(tab: EditorTab): string | null {
+export function editorSessionId(tab: EditorTab): string | null {
 	if (tab.kind === "chat" || tab.kind === "plan") return tab.sessionId;
 	return tab.kind === "doc" ? tab.sourceId : null;
 }

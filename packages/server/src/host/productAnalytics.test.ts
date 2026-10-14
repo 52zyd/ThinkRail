@@ -446,6 +446,7 @@ test("host handlers exclude Default provisioning and hydration; observing a muta
 	const { root, ctx, workspace, store, item, ref } = await taskFixture();
 	await handleRequest("todo.list", ref, ctx);
 	await handleRequest("todo.update", { ...ref, status: "in_progress" }, ctx);
+	await maybeAttachChangeArtifacts(workspace.id, ref.sessionId);
 	writeFileSync(join(root, "README.md"), "changed\n");
 	await handleRequest("todo.update", { ...ref, status: "done" }, ctx);
 	await handleRequest("todo.list", ref, ctx);
@@ -526,20 +527,21 @@ test("plan_opened rides an explicit todo.list open; plan_item_added rides todo.a
 	const { ref, ctx } = await taskFixture();
 	await handleRequest("todo.list", ref, ctx);
 	await handleRequest("todo.list", { ...ref, opened: "page" }, ctx);
-	await handleRequest("todo.list", { ...ref, opened: "popup" }, ctx);
+	await handleRequest("todo.list", { ...ref, opened: "rail" }, ctx);
 	await handleRequest("todo.add", { ...ref, title: "user step", surface: "chat" }, ctx);
 	await handleRequest("todo.add", { ...ref, title: "page step", surface: "page" }, ctx);
+	await handleRequest("todo.add", { ...ref, title: "rail step", surface: "rail" }, ctx);
 	await handleRequest("todo.add", { ...ref, title: "defaulted step" }, ctx);
 	await expect(handleRequest("todo.add", { ...ref, title: "   " }, ctx)).rejects.toThrow();
 	await shutdownAnalytics();
 	expect(
 		sent.filter((event) => event.event === "plan_opened").map((event) => event.properties.surface),
-	).toEqual(["page", "popup"]);
+	).toEqual(["page", "rail"]);
 	expect(
 		sent
 			.filter((event) => event.event === "plan_item_added")
 			.map((event) => event.properties.surface),
-	).toEqual(["chat", "page", "chat"]);
+	).toEqual(["chat", "page", "rail", "chat"]);
 });
 
 test("canonical TODO mutation observation waits for the real artifact reconciliation", async () => {

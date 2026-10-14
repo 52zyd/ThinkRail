@@ -16,7 +16,7 @@ import {
 	remoteRefOid,
 } from "../git";
 import { ghSetupProblem } from "../github";
-import { listTodos } from "../todos";
+import { generateTodoSummary, listTodos } from "../todos";
 import { getWorkspace, refreshUserOwnedWorkspace } from "../workspaces";
 import { renderPrBody } from "./prBody";
 
@@ -48,6 +48,7 @@ export async function previewPr(params: {
 	title?: string;
 }): Promise<PrDraft> {
 	const ws = getWorkspace(params.workspaceId);
+	await generateTodoSummary({ workspaceId: params.workspaceId, sessionId: params.sessionId });
 	return {
 		title: params.title?.trim() || ws.branch,
 		body: renderPrBody(await listTodos(params)),

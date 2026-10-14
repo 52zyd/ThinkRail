@@ -140,13 +140,6 @@ export function setAutoCycles(root: string, sessionId: string, id: string, value
 	writeFile(root, sessionId, file);
 }
 
-export function clearAutoCycles(root: string, sessionId: string, id: string): void {
-	const file = readFile(root, sessionId);
-	if (!file.autoCycles?.[id]) return;
-	delete file.autoCycles[id];
-	writeFile(root, sessionId, file);
-}
-
 export function readReviewRecords(
 	root: string,
 	sessionId: string,
@@ -201,6 +194,13 @@ export function restoreReviewRecord(
 	else delete file.items[id];
 	writeFile(root, sessionId, file);
 	return true;
+}
+
+export function clearAutoCycles(root: string, sessionId: string, id: string): void {
+	const file = readFile(root, sessionId);
+	if (!file.autoCycles?.[id]) return;
+	delete file.autoCycles[id];
+	writeFile(root, sessionId, file);
 }
 
 export function dropReviewRecord(

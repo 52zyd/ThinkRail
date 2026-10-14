@@ -29,14 +29,16 @@ export function VerificationGlyph({ verification }: { verification: string }) {
 	const status = verificationStatus(verification);
 	const Icon = status === "claimed" ? ShieldCheck : CircleAlert;
 	return (
-		<Icon
-			data-testid="todo-verification-glyph"
-			data-status={status}
-			aria-label={verification}
-			className={`size-14 shrink-0 ${
-				status === "claimed" ? "text-feedback-success" : "text-feedback-warning"
-			}`}
-		/>
+		<span title={verification} className="inline-flex">
+			<Icon
+				data-testid="todo-verification-glyph"
+				data-status={status}
+				aria-label={verification}
+				className={`size-14 shrink-0 ${
+					status === "claimed" ? "text-feedback-success" : "text-feedback-warning"
+				}`}
+			/>
+		</span>
 	);
 }
 

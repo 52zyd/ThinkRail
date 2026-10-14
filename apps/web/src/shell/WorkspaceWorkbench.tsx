@@ -16,6 +16,7 @@ import {
 	useState,
 } from "react";
 import { prepareChatTitle } from "../chat/chatTitle";
+import { useAutoPlanSummary } from "../chat/useChatTodos";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { QuietScrollArea } from "../components/QuietScrollArea";
 import { LoadingRegion } from "../components/Skeleton";
@@ -38,6 +39,7 @@ import { useLoadWorkspaceTurns } from "../panels/useWorkspaceTurns";
 import {
 	createChangesTab,
 	type EditorTab,
+	editorSessionId,
 	isConnectedGeneration,
 	isDefaultWorkspace,
 	isExternalWorkspace,
@@ -45,6 +47,7 @@ import {
 	selectCanRenameChat,
 	selectContextProject,
 	selectDiffTabTargetRef,
+	selectRailPlanSessionId,
 	selectReviewDraftCount,
 	selectWorkspaceById,
 	selectWorkspaceNavTick,
@@ -84,11 +87,23 @@ import { syncLegacySelectionFromAttention, useLegacySelectionAdapter } from "./l
 import { useTerminalPlacementReconciliation } from "./terminalReconciliation";
 import { WorkspaceChatHistory } from "./WorkspaceChatHistory";
 
+function PlanSummaryAutoDraft({
+	workspaceId,
+	sessionId,
+}: {
+	workspaceId: string;
+	sessionId: string;
+}) {
+	useAutoPlanSummary(workspaceId, sessionId);
+	return null;
+}
+
 const ChatView = lazy(() => import("../chat/ChatView"));
 const PlanPane = lazy(() => import("../panels/PlanPane"));
 const ChangesReviewPane = lazy(() =>
 	import("../panels/ChangesReviewPane").then((module) => ({ default: module.ChangesReviewPane })),
 );
+const PlanRailPane = lazy(() => import("../panels/PlanRailPane"));
 
 const NO_EDITOR_TABS: EditorTab[] = [];
 
@@ -280,6 +295,14 @@ export function WorkspaceWorkbench({ workspaceId }: { workspaceId: string }) {
 	const workspace = useAppStore((state) => selectWorkspaceById(state, workspaceId));
 	const contextProject = useAppStore(selectContextProject);
 	const editorTabs = useAppStore((state) => state.tabsByWorkspace[workspaceId] ?? NO_EDITOR_TABS);
+	const planSessionIds = useMemo(() => {
+		const seen = new Set<string>();
+		for (const tab of editorTabs) {
+			const sid = editorSessionId(tab);
+			if (sid) seen.add(sid);
+		}
+		return [...seen];
+	}, [editorTabs]);
 	const chatStarting = useAppStore((state) => (state.chatStartsByWorkspace[workspaceId] ?? 0) > 0);
 	const deletedSessions = useAppStore((state) => state.deletedSessionsByWorkspace[workspaceId]);
 	const terminalClose = useTerminalClose();
@@ -287,6 +310,7 @@ export function WorkspaceWorkbench({ workspaceId }: { workspaceId: string }) {
 	const review = useWorkspaceReview(workspaceId);
 	useLoadWorkspaceTurns(workspaceId);
 	const reviewComments = useAppStore((state) => state.reviewsByWorkspace[workspaceId]?.comments);
+	const railPlanSessionId = useAppStore((state) => selectRailPlanSessionId(state, workspaceId));
 	const reviewDraftCount = useAppStore((state) => selectReviewDraftCount(state, workspaceId));
 	const reviewFlagByPath = useMemo(() => reviewFlags(reviewComments), [reviewComments]);
 	const [focusRequest, setFocusRequest] = useState<LayoutTabFocusRequest | null>(null);
@@ -567,6 +591,20 @@ export function WorkspaceWorkbench({ workspaceId }: { workspaceId: string }) {
 			),
 			changes: <ChangesPanel key={workspaceId} workspaceId={workspaceId} />,
 			review: <ReviewPanel key={workspaceId} workspaceId={workspaceId} failed={review.failed} />,
+			plan: railPlanSessionId ? (
+				<ErrorBoundary label="plan rail" resetKeys={[workspaceId, railPlanSessionId]}>
+					<Suspense fallback={<MissingResource label="plan" />}>
+						<PlanRailPane workspaceId={workspaceId} sessionId={railPlanSessionId} />
+					</Suspense>
+				</ErrorBoundary>
+			) : (
+				<div
+					data-testid="plan-rail-empty"
+					className="flex h-full items-center justify-center p-16 text-text-subtle tr-text-ui"
+				>
+					Open a chat to see its plan here.
+				</div>
+			),
 		};
 		for (const tool of Object.keys(bodies) as LayoutToolId[]) {
 			bodies[tool] = (
@@ -576,7 +614,7 @@ export function WorkspaceWorkbench({ workspaceId }: { workspaceId: string }) {
 			);
 		}
 		return bodies;
-	}, [review.failed, specs.failed, specs.reload, workspaceId]);
+	}, [railPlanSessionId, review.failed, specs.failed, specs.reload, workspaceId]);
 	const renderToolBody = useCallback((tool: LayoutToolId) => toolBodies[tool], [toolBodies]);
 
 	const isDefault = workspace != null && isDefaultWorkspace(workspace);
@@ -713,6 +751,13 @@ export function WorkspaceWorkbench({ workspaceId }: { workspaceId: string }) {
 
 	return (
 		<div data-testid="workspace-workbench" data-layout-status="settled" className="contents">
+			{planSessionIds.map((sessionId) => (
+				<PlanSummaryAutoDraft
+					key={`plan-summary-draft:${workspaceId}:${sessionId}`}
+					workspaceId={workspaceId}
+					sessionId={sessionId}
+				/>
+			))}
 			<Workbench
 				workspaceId={workspaceId}
 				document={rendered.document}

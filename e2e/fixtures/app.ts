@@ -179,9 +179,10 @@ export async function enterDefaultWorkspace(page: Page): Promise<void> {
 	await expect(page.getByTestId("center-tabs")).toBeVisible();
 }
 
+// Use this helper when a pane must be visible; rail controls toggle on each click.
 export async function revealWorkbenchTool(
 	page: Page,
-	tool: "projects" | "specs" | "files" | "changes" | "review",
+	tool: "projects" | "specs" | "files" | "changes" | "review" | "plan",
 ): Promise<void> {
 	const control = page.getByTestId(`tool-rail-${tool}`);
 	await expect(control).toBeVisible();

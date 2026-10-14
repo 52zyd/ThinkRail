@@ -616,7 +616,7 @@ export interface WsMethodMap {
 	};
 	"spec.graph": { params: { workspaceId: string }; result: SpecGraphSnapshot };
 	"todo.list": {
-		params: { workspaceId: string; sessionId: string; opened?: "page" | "popup" };
+		params: { workspaceId: string; sessionId: string; opened?: "page" | "rail" };
 		result: TodoPlan;
 	};
 	"todo.add": {
@@ -625,7 +625,7 @@ export interface WsMethodMap {
 			sessionId: string;
 			title: string;
 			note?: string;
-			surface?: "chat" | "page";
+			surface?: "chat" | "page" | "rail";
 		};
 		result: TodoItem;
 	};

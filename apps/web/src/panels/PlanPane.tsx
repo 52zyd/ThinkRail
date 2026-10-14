@@ -16,7 +16,6 @@ import {
 	RiChat1Line as MessageSquare,
 	RiMore2Line as MoreVertical,
 	RiAddLine as Plus,
-	RiDeleteBin6Line as Trash2,
 } from "@remixicon/react";
 import type { ReviewComment, TodoGroupItem, TodoItem } from "@thinkrail/contracts";
 import {
@@ -31,7 +30,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { AskStatesContext, deriveAskStates } from "../chat/askState";
 import { type ChatActions, ChatActionsContext } from "../chat/ChatActions";
 import { Markdown } from "../chat/Markdown";
-import { VerificationBadge, VerificationGlyph } from "../chat/planKit";
+import { SectionLabel, VerificationBadge, VerificationGlyph } from "../chat/planKit";
 import { planToMarkdown } from "../chat/planMarkdown";
 import {
 	adoptedCommits,
@@ -250,7 +249,6 @@ function ItemBlock({
 	onOpenCommit,
 	onStartReview,
 	onOpenReview,
-	onRemove,
 	reviewComments,
 	startDisabled,
 	focusRequest,
@@ -261,7 +259,6 @@ function ItemBlock({
 	onOpenCommit: (sha: string) => void;
 	onStartReview: (id: string) => Promise<void>;
 	onOpenReview: () => void;
-	onRemove?: ((id: string) => void) | undefined;
 	reviewComments: ReviewComment[] | undefined;
 	startDisabled: boolean;
 	focusRequest: { id: string; tick: number } | null;
@@ -307,9 +304,9 @@ function ItemBlock({
 					className="flex min-h-24 shrink-0 items-center"
 					title={
 						reviewing
-							? "Reviewing — the reviewer agent is reading this step"
+							? "Checking — the reviewer agent is reading this step"
 							: changesRequested
-								? "Changes requested"
+								? "Needs a fix"
 								: undefined
 					}
 				>
@@ -355,7 +352,7 @@ function ItemBlock({
 								title="A review subagent is reading this step…"
 								className="min-h-8 shrink-0 animate-pulse tr-text-metadata text-primary"
 							>
-								Reviewing…
+								Checking…
 							</span>
 						) : changesRequested ? (
 							<button
@@ -366,7 +363,7 @@ function ItemBlock({
 								className="flex min-h-8 shrink-0 items-center gap-2 tr-text-metadata text-feedback-warning underline-offset-2 hover:underline"
 							>
 								<CircleAlert className="size-14" />
-								Changes requested
+								Needs a fix
 								{findings > 0 ? ` · ${findings}` : ""}
 							</button>
 						) : needsReview ? (
@@ -382,7 +379,7 @@ function ItemBlock({
 								onClick={() => onStartReview(item.id)}
 								className="flex h-24 shrink-0 items-center rounded-sm bg-control-primary-bg px-8 text-control-primary-text tr-text-action opacity-100 transition hover:bg-control-primary-bg-hovered focus-visible:opacity-100 disabled:bg-control-primary-disabled-bg disabled:text-control-primary-disabled-text [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
 							>
-								Start review
+								Check it
 							</button>
 						) : reviewed ? (
 							<span
@@ -391,46 +388,44 @@ function ItemBlock({
 								className="flex min-h-8 shrink-0 items-center gap-2 tr-text-metadata text-feedback-success"
 							>
 								<CircleCheck className="size-14" />
-								Verified
+								Checked
 							</span>
 						) : null}
-						{onRemove ? (
-							<IconTooltip
-								label={
-									reviewing
-										? "Reviewing… — wait for the review to finish before removing"
-										: "Remove"
-								}
-							>
-								<button
-									type="button"
-									data-testid="plan-item-remove"
-									onClick={() => onRemove(item.id)}
-									disabled={reviewing}
-									aria-label="Remove"
-									className="flex size-24 shrink-0 items-center justify-center rounded-sm text-text-muted opacity-0 transition-opacity hover:bg-container-elevated-bg hover:text-feedback-error focus-visible:opacity-100 group-hover:opacity-100 disabled:pointer-events-none disabled:opacity-0"
-								>
-									<Trash2 className="size-14" />
-								</button>
-							</IconTooltip>
-						) : null}
 					</div>
-					{collapsible && (item.verification || set) ? (
-						<span className="flex items-center gap-8 tr-text-metadata text-text-subtle group-data-[expanded=true]:hidden">
-							<span className="size-14 shrink-0" />
-							{item.verification ? <VerificationGlyph verification={item.verification} /> : null}
-							{set ? (
-								<span>
-									{fileCount} {fileCount === 1 ? "file" : "files"}
+					{collapsible && (item.summary || item.verification || set) ? (
+						<div
+							data-testid="plan-item-meta"
+							className="flex flex-col gap-2 tr-text-metadata text-text-subtle group-data-[expanded=true]:hidden"
+						>
+							{item.status === "done" && item.summary ? (
+								<span data-testid="plan-item-summary-preview" className="flex items-start gap-8">
+									<span className="size-14 shrink-0" />
+									<Markdown
+										text={item.summary}
+										className={`min-w-0 flex-1 line-clamp-1 ${SUMMARY_PROSE}`}
+									/>
 								</span>
 							) : null}
-							{set?.kind === "commit" && counts ? (
-								<span className="flex items-center gap-8 max-sm:hidden">
-									<span className="tr-code-text">{set.sha.slice(0, 7)}</span>
-									<DiffStatBadge added={counts.added} removed={counts.removed} />
+							{item.verification || set ? (
+								<span className="flex items-center gap-8">
+									<span className="size-14 shrink-0" />
+									{item.verification ? (
+										<VerificationGlyph verification={item.verification} />
+									) : null}
+									{set ? (
+										<span>
+											{fileCount} {fileCount === 1 ? "file" : "files"}
+										</span>
+									) : null}
+									{set?.kind === "commit" && counts ? (
+										<span className="flex items-center gap-8 max-sm:hidden">
+											<span className="tr-code-text">{set.sha.slice(0, 7)}</span>
+											<DiffStatBadge added={counts.added} removed={counts.removed} />
+										</span>
+									) : null}
 								</span>
 							) : null}
-						</span>
+						</div>
 					) : null}
 				</div>
 			</div>
@@ -466,55 +461,39 @@ function ItemBlock({
 const SUMMARY_PROSE = [
 	"max-w-none break-words text-text-muted",
 	"[&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+	"[&_h1]:mt-12 [&_h1]:mb-8 [&_h1]:tr-title-dialog [&_h1]:text-text-default",
+	"[&_h2]:mt-12 [&_h2]:mb-8 [&_h2]:tr-title-dialog [&_h2]:text-text-default",
+	"[&_h3]:mt-12 [&_h3]:mb-4 [&_h3]:tr-title-section [&_h3]:text-text-default",
+	"[&_h4]:mt-8 [&_h4]:mb-4 [&_h4]:tr-title-section [&_h4]:text-text-default",
 	"[&_p]:my-4 [&_strong]:text-text-default",
 	"[&_a]:text-primary [&_a]:underline [&_a]:underline-offset-2",
 	"[&_ul]:my-4 [&_ul]:list-disc [&_ul]:pl-16 [&_ol]:my-4 [&_ol]:list-decimal [&_ol]:pl-16 [&_li]:my-2",
+	"[&_li>ul]:my-2 [&_li>ol]:my-2 [&_li_p]:my-2",
+	"[&_code]:rounded-xs [&_code]:bg-container-elevated-bg [&_code]:px-4 [&_code]:py-2 [&_code]:tr-code-text [&_code]:text-text-default",
+	"[&_pre]:my-8 [&_pre]:overflow-x-auto [&_pre]:rounded-sm [&_pre]:border [&_pre]:border-border-default [&_pre]:bg-container-elevated-bg [&_pre]:p-8",
+	"[&_pre_code]:bg-transparent [&_pre_code]:p-0 [&_pre_code]:tr-code-text",
+	"[&_blockquote]:my-8 [&_blockquote]:border-primary-muted [&_blockquote]:border-l-2 [&_blockquote]:pl-8 [&_blockquote]:text-text-muted",
+	"[&_hr]:my-12 [&_hr]:h-px [&_hr]:border-0 [&_hr]:bg-border-default",
 ].join(" ");
 
 function PlanSummary({ summary, stale = false }: { summary: string; stale?: boolean }) {
-	const [open, setOpen] = useState(false);
-	const clampable = summary.length > 160;
-	const header = (
-		<>
-			<span className="tr-text-eyebrow text-text-subtle">Summary</span>
-			{stale ? (
-				<span
-					data-testid="plan-summary-stale"
-					title="Showing the last completed recap until the plan finishes again"
-					className="flex items-center gap-4 tr-text-metadata text-text-muted"
-				>
-					<Loader2 className="size-14 shrink-0 animate-spin text-text-muted" />
-					Updating…
-				</span>
-			) : null}
-		</>
-	);
 	return (
 		<div className={`${PLAN_CARD_CLASS} flex flex-col gap-8`}>
-			{clampable ? (
-				<button
-					type="button"
-					data-testid="plan-overall-summary-toggle"
-					aria-expanded={open}
-					title={open ? "Collapse the summary" : "Expand the summary"}
-					onClick={() => setOpen((v) => !v)}
-					className="flex w-full flex-wrap items-center gap-x-8 gap-y-2 text-left"
-				>
-					{header}
-					<ChevronRight
-						className={`ml-auto size-16 shrink-0 text-text-muted transition-transform ${
-							open ? "rotate-90" : ""
-						}`}
-					/>
-				</button>
-			) : (
-				<div className="flex flex-wrap items-center gap-x-8 gap-y-2">{header}</div>
-			)}
-			<div data-testid="plan-overall-summary">
-				<Markdown
-					text={summary}
-					className={`tr-text-ui ${SUMMARY_PROSE} ${clampable && !open ? "line-clamp-2" : ""}`}
-				/>
+			<div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+				<span className="tr-text-eyebrow text-text-subtle">Summary</span>
+				{stale ? (
+					<span
+						data-testid="plan-summary-stale"
+						title="Showing the last completed recap until the plan finishes again"
+						className="flex items-center gap-4 tr-text-metadata text-text-muted"
+					>
+						<Loader2 className="size-14 shrink-0 animate-spin text-text-muted" />
+						Updating…
+					</span>
+				) : null}
+			</div>
+			<div data-testid="plan-overall-summary" className="max-h-[40vh] overflow-y-auto">
+				<Markdown text={summary} className={`tr-text-ui ${SUMMARY_PROSE}`} />
 			</div>
 		</div>
 	);
@@ -527,7 +506,6 @@ function GroupSection({
 	onOpenCommit,
 	onStartReview,
 	onOpenReview,
-	onRemove,
 	reviewComments,
 	startDisabled,
 	focusRequest,
@@ -538,20 +516,29 @@ function GroupSection({
 	onOpenCommit: (sha: string) => void;
 	onStartReview: (id: string) => Promise<void>;
 	onOpenReview: () => void;
-	onRemove?: ((id: string) => void) | undefined;
 	reviewComments: ReviewComment[] | undefined;
 	startDisabled: boolean;
 	focusRequest: { id: string; tick: number } | null;
 }) {
 	const { done, total } = groupProgress(group);
+	const empty = group.todos.length === 0;
 	return (
-		<section className="mb-16" data-testid="plan-group">
+		<section className="mb-16" data-testid="plan-group" data-empty={empty || undefined}>
 			<h2 className="mb-4 flex items-baseline gap-8 border-border-default border-b pb-4 tr-title-dialog text-text-default">
 				<span className="min-w-0 flex-1 break-words">{group.title}</span>
 				<span className="shrink-0 tr-text-eyebrow text-text-subtle">
-					{done}/{total}
+					{empty ? "planning\u2026" : `${done}/${total}`}
 				</span>
 			</h2>
+			{empty ? (
+				<p
+					data-testid="plan-group-planning"
+					className="flex items-center gap-8 px-4 py-4 tr-text-metadata text-text-subtle"
+				>
+					<Loader2 className="size-14 shrink-0 animate-spin text-primary" />
+					The plan for this task is forming
+				</p>
+			) : null}
 			<ul className="flex flex-col">
 				{group.todos.map((item) => (
 					<ItemBlock
@@ -562,7 +549,6 @@ function GroupSection({
 						onOpenCommit={onOpenCommit}
 						onStartReview={onStartReview}
 						onOpenReview={onOpenReview}
-						onRemove={onRemove}
 						reviewComments={reviewComments}
 						startDisabled={startDisabled}
 						focusRequest={focusRequest}
@@ -664,19 +650,8 @@ function PlanCardSection({
 	);
 }
 
-// The Session block's LIVE slot. Subscribes to the session runtime itself (isolating re-renders from
-// the heavy PlanPane). Shows the pending question as the SAME `AskUserQuestionCard` the chat uses
-// (answerable in place via a real `session.answerQuestion`, chat-only actions no-op); otherwise, when
-// no plan item is in progress (`showAgentMessage`), shows the agent's latest message so the plan stays
-// transparent about what it's doing when it isn't asking or on a step. Renders nothing when neither.
-function PlanSessionLive({
-	sessionId,
-	showAgentMessage,
-}: {
-	workspaceId: string;
-	sessionId: string;
-	showAgentMessage: boolean;
-}) {
+// Keep the session's live slot isolated from the heavy PlanPane.
+function PlanSessionLive({ sessionId }: { workspaceId: string; sessionId: string }) {
 	const runtime = useAppStore((s) => s.sessions[sessionId]);
 	const [focusScope] = useState<object>(() => ({}));
 	const actions = useMemo<ChatActions>(
@@ -715,7 +690,7 @@ function PlanSessionLive({
 			</ChatActionsContext.Provider>
 		);
 	}
-	const message = showAgentMessage && runtime ? lastAgentText(runtime) : undefined;
+	const message = runtime ? lastAgentText(runtime) : undefined;
 	if (!message) return null;
 	return (
 		<div data-testid="plan-agent-message" className="mb-8 flex items-start gap-8 px-4">
@@ -750,7 +725,7 @@ function SessionBlock({
 	pendingLoose: TodoItem[];
 	allDone: boolean;
 	glance: PlanGlance;
-	renderLive: (showAgentMessage: boolean) => ReactNode;
+	renderLive: () => ReactNode;
 	onAdd: (title: string) => Promise<void>;
 	onOpenChat: () => void;
 	onSend: (text: string) => Promise<void> | void;
@@ -765,7 +740,7 @@ function SessionBlock({
 		<section data-testid="plan-now-executing" className={PLAN_CARD_CLASS}>
 			<div className="mb-8 flex items-center gap-8">
 				<CircleDot className="size-14 shrink-0 text-primary" />
-				<h2 className="shrink-0 tr-title-dialog text-text-default">Session</h2>
+				<h2 className="shrink-0 tr-title-dialog text-text-default">Now</h2>
 				{glance === "working" ? (
 					<button
 						type="button"
@@ -776,7 +751,7 @@ function SessionBlock({
 						className="flex min-w-0 items-center gap-4 tr-text-metadata text-text-subtle underline-offset-2 hover:text-text-default hover:underline"
 					>
 						<Loader2 className="size-14 shrink-0 animate-spin text-primary" />
-						Working…
+						Working on this
 					</button>
 				) : glance === "waiting_question" ? (
 					<button
@@ -802,7 +777,7 @@ function SessionBlock({
 					Task
 				</button>
 			</div>
-			{renderLive(!hasActive)}
+			{renderLive()}
 			{hasActive ? (
 				<>
 					{activeGroups.map(renderGroup)}
@@ -813,6 +788,7 @@ function SessionBlock({
 			) : null}
 			{hasPending ? (
 				<>
+					{hasActive ? <SectionLabel label="Up next" /> : null}
 					{pendingGroups.map(renderGroup)}
 					{pendingLoose.length > 0 ? (
 						<ul className="flex flex-col">{pendingLoose.map(renderItem)}</ul>
@@ -1133,14 +1109,14 @@ export default function PlanPane({
 					alreadyRunning
 						? {
 								variant: "info",
-								title: "Review All is already running",
-								message: "The current pass continues — the per-row Reviewing… pulses track it.",
+								title: "Check All is already running",
+								message: "The current pass continues — the per-row Checking… pulses track it.",
 							}
 						: total > 0
 							? {
 									variant: "success",
-									title: "Review All started",
-									message: `Reviewing ${total} step${total === 1 ? "" : "s"} one at a time — findings land in the Review tab.`,
+									title: "Check All started",
+									message: `Checking ${total} step${total === 1 ? "" : "s"} one at a time — findings land in the Review tab.`,
 								}
 							: {
 									variant: "info",
@@ -1150,7 +1126,7 @@ export default function PlanPane({
 				);
 			},
 			(err) => {
-				pushToast({ variant: "error", title: "Review All didn't start", message: errorText(err) });
+				pushToast({ variant: "error", title: "Check All didn't start", message: errorText(err) });
 			},
 		);
 	const copyMarkdown = () => {
@@ -1181,7 +1157,6 @@ export default function PlanPane({
 			onOpenCommit={onOpenCommit}
 			onStartReview={startReview}
 			onOpenReview={onOpenReview}
-			onRemove={plan.remove}
 			reviewComments={reviewComments}
 			startDisabled={reviewingAny || !canReview}
 			focusRequest={focusRequest}
@@ -1196,7 +1171,6 @@ export default function PlanPane({
 			onOpenCommit={onOpenCommit}
 			onStartReview={startReview}
 			onOpenReview={onOpenReview}
-			onRemove={plan.remove}
 			reviewComments={reviewComments}
 			startDisabled={reviewingAny || !canReview}
 			focusRequest={focusRequest}
@@ -1397,7 +1371,7 @@ export default function PlanPane({
 										onSelect={() => void reviewAll()}
 									>
 										<ListChecks />
-										Review All
+										Check All
 										{unsettledReviewables.length > 0 ? ` (${unsettledReviewables.length})` : ""}
 									</DropdownMenuItem>
 								</>
@@ -1437,7 +1411,7 @@ export default function PlanPane({
 							onClick={() => void reviewAll()}
 							className={NEXT_ACTION_BUTTON_CLASS}
 						>
-							Review All
+							Check All
 						</button>
 					</div>
 				) : openReview && diverged ? (
@@ -1514,13 +1488,7 @@ export default function PlanPane({
 					pendingLoose={sections.pendingLoose}
 					allDone={buildDone}
 					glance={glance}
-					renderLive={(showAgentMessage) => (
-						<PlanSessionLive
-							workspaceId={workspaceId}
-							sessionId={sessionId}
-							showAgentMessage={showAgentMessage}
-						/>
-					)}
+					renderLive={() => <PlanSessionLive workspaceId={workspaceId} sessionId={sessionId} />}
 					onAdd={(title) => plan.add(title, "page")}
 					onOpenChat={() => {
 						void openChatInTab(workspaceId, sessionId);

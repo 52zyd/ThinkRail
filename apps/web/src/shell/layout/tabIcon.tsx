@@ -14,6 +14,8 @@ import {
 	RiLayout2Fill,
 	RiLayout2Line,
 	RiListCheck3,
+	RiTaskFill,
+	RiTaskLine,
 	RiTerminalBoxFill,
 	RiTerminalBoxLine,
 } from "@remixicon/react";
@@ -52,6 +54,8 @@ export function tabIcon(tab: LayoutTab, active = false): ReactNode {
 					return <CustomIcon name={active ? "file-diff-fill" : "file-diff-line"} className={cls} />;
 				case "review":
 					return active ? <RiDiscussFill className={cls} /> : <RiDiscussLine className={cls} />;
+				case "plan":
+					return active ? <RiTaskFill className={cls} /> : <RiTaskLine className={cls} />;
 				default:
 					return active ? <RiLayout2Fill className={cls} /> : <RiLayout2Line className={cls} />;
 			}
