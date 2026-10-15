@@ -2,6 +2,7 @@ import {
 	RiPuzzleLine as Puzzle,
 	RiRefreshLine as RefreshCw,
 	RiShieldCheckLine as ShieldCheck,
+	RiAlertLine as TriangleAlert,
 } from "@remixicon/react";
 import type { Project, SkillCatalogEntry, Workspace } from "@thinkrail/contracts";
 import { Button } from "@thinkrail/ui/button";
@@ -275,33 +276,38 @@ export function SkillsDialog({
 				{trustNotice.kind === "untrusted" ? (
 					<div
 						data-testid="skills-trust-all"
-						className="flex items-center gap-8 rounded-sm border border-border-default border-l-[3px] border-l-feedback-warning bg-feedback-warning-subtle px-12 py-8"
+						className="flex flex-col gap-8 rounded-sm border border-feedback-warning-muted bg-container-elevated-bg px-12 py-8"
 					>
-						<span className="flex min-w-0 flex-1 flex-col gap-2">
-							<span className="tr-text-ui text-text-default">
-								{untrustedNoticeText(trustNotice)}
+						<div className="flex items-start gap-8">
+							<TriangleAlert className="mt-2 size-14 shrink-0 text-feedback-warning" aria-hidden />
+							<span className="flex min-w-0 flex-1 flex-col gap-2">
+								<span className="tr-text-ui text-text-default">
+									{untrustedNoticeText(trustNotice)}
+								</span>
+								{trustEnables ? (
+									<span className="text-text-muted tr-text-metadata">{trustEnables}</span>
+								) : null}
 							</span>
-							{trustEnables ? (
-								<span className="text-text-muted tr-text-metadata">{trustEnables}</span>
-							) : null}
-						</span>
-						<Button
-							size="sm"
-							disabled={busy}
-							onClick={() =>
-								void mutate(
-									() =>
-										getTransport().request(
-											"project.setTrust",
-											trustGrantParams(projectId, trustNotice),
-										),
-									"Couldn't trust project",
-								)
-							}
-							className="shrink-0"
-						>
-							Trust project
-						</Button>
+						</div>
+						<div className="flex justify-end">
+							<Button
+								variant="outline"
+								size="sm"
+								disabled={busy}
+								onClick={() =>
+									void mutate(
+										() =>
+											getTransport().request(
+												"project.setTrust",
+												trustGrantParams(projectId, trustNotice),
+											),
+										"Couldn't trust project",
+									)
+								}
+							>
+								Trust project
+							</Button>
+						</div>
 					</div>
 				) : null}
 

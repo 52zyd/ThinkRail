@@ -1,4 +1,5 @@
 import {
+	RiAlertLine,
 	RiCloseLine,
 	RiErrorWarningLine,
 	RiInformationLine,
@@ -317,26 +318,33 @@ export function ResourcesInspector(props: ResourcesInspectorProps) {
 						<p className="px-8 text-text-muted tr-text-metadata">Loading resources…</p>
 					) : null}
 					{props.stale ? (
-						<p className="mx-8 flex items-center gap-8 rounded-sm bg-feedback-warning-subtle px-8 py-4 text-feedback-warning tr-text-metadata">
-							<RiErrorWarningLine className="size-14 shrink-0" />
+						<p className="mx-8 flex items-center gap-8 rounded-sm border border-feedback-warning-muted bg-container-elevated-bg px-8 py-4 text-text-default tr-text-metadata">
+							<RiAlertLine className="size-14 shrink-0 text-feedback-warning" aria-hidden />
 							Snapshot is stale — controls return when the host reconnects.
 						</p>
 					) : null}
 					{props.error ? (
 						<div
 							role="alert"
-							className="mx-8 flex items-center gap-8 rounded-sm bg-feedback-error-subtle px-8 py-4 text-feedback-error tr-text-metadata"
+							className="mx-8 flex flex-col gap-8 rounded-sm border border-feedback-error-muted bg-container-elevated-bg px-8 py-4 text-text-default tr-text-metadata"
 						>
-							<RiErrorWarningLine className="size-14 shrink-0" />
-							<span className="min-w-0 flex-1 break-words">{props.error}</span>
-							<Button
-								variant="ghost"
-								size="sm"
-								data-testid="resources-retry"
-								onClick={props.onRetry}
-							>
-								Retry
-							</Button>
+							<div className="flex items-start gap-8">
+								<RiErrorWarningLine
+									className="mt-2 size-14 shrink-0 text-feedback-error"
+									aria-hidden
+								/>
+								<span className="min-w-0 flex-1 break-words">{props.error}</span>
+							</div>
+							<div className="flex justify-end">
+								<Button
+									variant="outline"
+									size="sm"
+									data-testid="resources-retry"
+									onClick={props.onRetry}
+								>
+									Retry
+								</Button>
+							</div>
 						</div>
 					) : null}
 					{section("Active", live, "resources-active", "Nothing is running in the background.")}
