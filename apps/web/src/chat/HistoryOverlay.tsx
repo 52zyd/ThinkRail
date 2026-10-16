@@ -518,7 +518,7 @@ export function HistoryOverlay({
 		<div
 			data-testid="history-overlay"
 			data-stage={stage}
-			className="absolute bottom-full left-8 right-8 mb-4 flex flex-col overflow-hidden rounded-lg border border-border-default bg-container-elevated-bg shadow-[var(--shadow-md)]"
+			className="absolute bottom-full left-8 right-8 z-20 mb-4 flex flex-col overflow-hidden rounded-lg border border-border-default bg-container-elevated-bg shadow-[var(--shadow-md)]"
 		>
 			<div className="flex items-center gap-8 border-b border-border-default p-8">
 				<input
