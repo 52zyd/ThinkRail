@@ -79,6 +79,7 @@ import {
 	type AskUserQuestionWaiters,
 	assessAnswerability,
 	buildAnswersMessage,
+	createAskUserQuestionTool,
 	createAskUserQuestionWaiters,
 	hasQuestionAck,
 } from "./askUserQuestion";
@@ -1348,6 +1349,7 @@ async function createParentSessionInternal(
 		const result = await createAgentSession({
 			...options,
 			modelRuntime: generation.runtime,
+			customTools: [createAskUserQuestionTool(askUserQuestionWaiters)],
 			resourceLoader: await buildResourceLoader(
 				cwd,
 				settingsManager,
@@ -1358,7 +1360,6 @@ async function createParentSessionInternal(
 					createBackgroundCommandsExtension({ service: commands }),
 					...mcpHost.extensions,
 				],
-				askUserQuestionWaiters,
 			),
 		});
 		session = result.session;
