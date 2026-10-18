@@ -1,10 +1,11 @@
 import {
 	RiCheckLine as Check,
+	RiFileCopyLine as Copy,
 	RiExternalLinkLine as ExternalLink,
 	RiLoader4Line as Loader2,
 	RiAlertLine as TriangleAlert,
 } from "@remixicon/react";
-import { Button } from "@thinkrail/ui/button";
+import { Button, buttonVariants } from "@thinkrail/ui/button";
 import {
 	Dialog,
 	DialogContent,
@@ -13,8 +14,12 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@thinkrail/ui/dialog";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { copyText } from "@/lib";
 import type { LoginState } from "./loginState";
+import { redirectsToLoopback, uiServedFromLoopback } from "./uiOrigin";
+
+const WAITING_FOR_BROWSER = "Waiting for you to finish signing in…";
 
 export function LoginDialog({
 	state,
@@ -38,6 +43,34 @@ export function LoginDialog({
 		openedUrlRef.current = deviceUri;
 		window.open(deviceUri, "_blank", "noopener,noreferrer");
 	}, [deviceUri]);
+
+	const [pasteOpen, setPasteOpen] = useState(() => !uiServedFromLoopback());
+	const [copied, setCopied] = useState(false);
+	const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	useEffect(() => () => (copiedTimer.current ? clearTimeout(copiedTimer.current) : undefined), []);
+	const [copyFailed, setCopyFailed] = useState(false);
+	const urlFieldRef = useRef<HTMLInputElement>(null);
+	const urlFieldId = useId();
+	useEffect(() => {
+		if (!copyFailed) return;
+		urlFieldRef.current?.focus();
+		urlFieldRef.current?.select();
+	}, [copyFailed]);
+	const copyUrl = async (url: string) => {
+		if (!(await copyText(url))) {
+			setCopyFailed(true);
+			return;
+		}
+		setCopied(true);
+		if (copiedTimer.current) clearTimeout(copiedTimer.current);
+		copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+	};
+
+	const pasteFallback =
+		state.input?.kind === "prompt" && state.url !== undefined && redirectsToLoopback(state.url);
+	const waitingForBrowser =
+		state.url !== undefined && (state.input?.kind !== "prompt" || pasteFallback);
+	const progress = waitingForBrowser ? WAITING_FOR_BROWSER : state.progress;
 
 	const submitPrompt = () => {
 		const value = promptRef.current?.value.trim() ?? "";
@@ -93,17 +126,44 @@ export function LoginDialog({
 				) : (
 					<div className="flex flex-col gap-12">
 						{state.url ? (
-							<div className="flex flex-col gap-4">
-								<Button
+							<div className="flex gap-8">
+								<a
+									href={state.url}
+									target="_blank"
+									rel="noopener noreferrer"
 									data-testid="login-open-url"
-									onClick={() => window.open(state.url, "_blank", "noopener,noreferrer")}
+									className={buttonVariants({ className: "flex-1" })}
 								>
 									<ExternalLink className="size-16" />
 									Open sign-in page
+								</a>
+								<Button
+									variant="outline"
+									data-testid="login-copy-url"
+									data-copied={copied || undefined}
+									onClick={() => {
+										if (state.url) void copyUrl(state.url);
+									}}
+								>
+									{copied ? <Check className="size-16" /> : <Copy className="size-16" />}
+									{copied ? "Copied" : "Copy link"}
 								</Button>
-								<code className="select-all break-all rounded-sm bg-control-bg px-8 py-4 tr-code-text text-text-muted">
-									{state.url}
-								</code>
+							</div>
+						) : null}
+
+						{state.url && copyFailed ? (
+							<div className="flex flex-col gap-4">
+								<label htmlFor={urlFieldId} className="text-text-muted tr-text-metadata">
+									Copy this link manually
+								</label>
+								<input
+									id={urlFieldId}
+									ref={urlFieldRef}
+									readOnly
+									value={state.url}
+									data-testid="login-url-field"
+									className="min-w-0 rounded-sm border border-control-border-default bg-control-bg px-8 py-4 tr-code-text text-text-default outline-none focus-visible:border-control-border-active"
+								/>
 							</div>
 						) : null}
 
@@ -151,9 +211,25 @@ export function LoginDialog({
 							</div>
 						) : null}
 
-						{state.input?.kind === "prompt" ? (
+						{state.input?.kind === "prompt" && pasteFallback && !pasteOpen ? (
+							<button
+								type="button"
+								data-testid="login-paste-toggle"
+								onClick={() => setPasteOpen(true)}
+								className="self-start rounded-sm text-text-muted tr-text-metadata underline underline-offset-2 outline-none hover:text-text-default focus-visible:ring-2 focus-visible:ring-primary"
+							>
+								Sign-in didn't finish? Paste the final URL
+							</button>
+						) : null}
+
+						{state.input?.kind === "prompt" && (!pasteFallback || pasteOpen) ? (
 							<div className="flex flex-col gap-4">
-								{state.input.message ? (
+								{pasteFallback ? (
+									<p className="text-text-muted tr-text-metadata" data-testid="login-paste-hint">
+										If sign-in doesn't finish automatically, copy the address your browser ends on
+										and paste it here.
+									</p>
+								) : state.input.message ? (
 									<p className="text-text-muted tr-text-ui">{state.input.message}</p>
 								) : null}
 								<div className="flex gap-8">
@@ -178,13 +254,13 @@ export function LoginDialog({
 							</div>
 						) : null}
 
-						{state.progress ? (
+						{progress ? (
 							<p
 								className="flex items-center gap-8 text-text-muted tr-text-ui"
 								data-testid="login-progress"
 							>
 								<Loader2 className="size-16 shrink-0 animate-spin" />
-								{state.progress}
+								{progress}
 							</p>
 						) : null}
 

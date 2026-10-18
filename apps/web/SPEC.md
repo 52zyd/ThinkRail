@@ -153,7 +153,8 @@ change. `dist/` therefore has no profiler timers (`actualStartTime` is absent fr
 - `chat` → `contracts` (pi message types, **type-only**), `ui`, `extension-api/web`, `ext-visualize/web`, `extensions` (registration only), `components` (`useNow`, and the `RunningIcon` badge in the stream footer), `prompt` (shared slash/template behavior), `lib`, `clientPreferences`; `store` + `transport`  (**app-integration files only** — the renderers stay store-free; see `chat/SPEC.md` for the current set)
 - `prompt` → `contracts` (slash/template types only), `@thinkrail/ui/utils` (`cn`), and React; it has no lifecycle integration dependency
 - `extensions` → `ext-*/web`, `extension-api/web`, `chat/toolRegistry` (registration only; no ChatView import)
-- `auth` → `ui` (the dialog is store/transport-free — the panel integrates it; the state types need no imports)- `store` → `transport` (**type-only** — `ConnectionStatus`), `chat` (**type-only** — `ChatTurn`/`ToolResultState`), `auth` (**type-only** — `LoginState`; the `foldLoginFrame` reducer lives in `store`, like `reduceExtUi`), `contracts` (domain + custom-preset types, never current-layout DTOs), `lib` (shared path/array primitives — a leaf, so no cycle), and `shell/layout` (**type-only** for web-local frame/view state)
+- `auth` → `ui`, `lib` (`copyText`; the dialog is store/transport-free — the panel integrates it; the state types need no imports)
+- `store` → `transport` (**type-only** — `ConnectionStatus`), `chat` (**type-only** — `ChatTurn`/`ToolResultState`), `auth` (**type-only** — `LoginState`; the `foldLoginFrame` reducer lives in `store`, like `reduceExtUi`), `contracts` (domain + custom-preset types, never current-layout DTOs), `lib` (shared path/array primitives — a leaf, so no cycle), and `shell/layout` (**type-only** for web-local frame/view state)
 - `transport` → `contracts`, `store` (welcome routing; the `store → transport` back-edge is type-only, so
   the runtime graph is acyclic), `lib` (plain-HTTP-safe random page identity)
 - `components` → `lib` (`ErrorBoundary`'s `shallowEqualArrays` for its reset keys) and `constants` (`RunningIcon` draws the shared brand monogram) — both leaves, so any region can still wrap in it; presentational controls consume `ui`
@@ -174,8 +175,10 @@ nor initializes its pool. Renderer metadata and loaders are the only eager edge.
 retain distinct Pierre diff, Pierre file, worker-pool, and Monaco chunks, with none of their implementation
 code in the entry chunk.
 Vite emits every worker as an ES module (`worker.format: "es"`), so worker `import()` calls split into
-on-demand chunks instead of inlining; every target webview (Chromium, WebKit/Safari 15+, WebView2) runs
-module workers.
+on-demand chunks instead of inlining; every target webview (Chromium, WebKit/Safari 17+, WebView2) runs
+module workers. Safari/WebKit 17 is the browser floor: the shipped webviews (macOS 12+ system WebKit,
+Ubuntu 24.04 WebKitGTK, WebView2) all meet it, so web code may use baseline-17 APIs such as
+`URL.canParse`.
 
 The module set: `transport` / `store` / branded `shell` + its headless `shell/layout` child;
 layout-agnostic Project/File/Specs/Changes/Review renderers; registry-dispatched resource bodies and lazy xterm terminal
