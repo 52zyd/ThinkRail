@@ -40,7 +40,10 @@ treatment.
   ~700ms long press is its touch equivalent. With a project-name button focused, the standard Context Menu
   key or Shift+F10 opens the same menu for keyboard-only use; arrow/activate/Escape keys work normally.
   The menu is neutral: **Plus Create workspace**, **FolderOpen Open existing worktree…**, separator,
-  **X Close project**. Create is exactly the direct `+` flow. Open existing worktree opens the
+  **Pencil Rename** (only when the host's protocol is at least `PROJECT_RENAME_PROTOCOL_VERSION`), **X Close
+  project**. Rename swaps the project name for the same inline input as workspace rename (Enter/blur
+  commits a changed trimmed name via `project.rename`, Escape cancels) and waits for the `project.updated`
+  push — no optimistic label; rejection raises an error toast. Create is exactly the direct `+` flow. Open existing worktree opens the
   `ExistingWorktreeDialog` chooser fed by `workspace.listExisting` (branch + absolute path per row;
   detached-HEAD rows stay visible but disabled); choosing one calls `workspace.openExisting`, then expands
   the project and activates the attached row without starting a chat. Close
@@ -63,7 +66,7 @@ treatment.
   `workspace.openIn`, while terminal-kind Vim activates the workspace and runs through `addTerminal`'s
   one-shot `initialCommand`. Copy writes `worktreePath`; Reveal calls `workspace.reveal`. These requests,
   `editor.list`, the project workspace-list load, the remove confirm (`RemoveWorkspaceDialog`), and the
-  inline-rename controller below (`createRenameController` / `useWorkspaceRename`) live once in
+  inline-rename controller below (`createRenameController` / `useInlineRename`, shared with project rename) live once in
   `workspaceActions.ts` so the shell's topbar workspace menu ([[submodule-web-shell-location-bar]]) offers
   the same actions — including the capability-aware pending rename — without a second implementation. The
   controller dispatches to the workspace captured when the edit started and resets when the hook's

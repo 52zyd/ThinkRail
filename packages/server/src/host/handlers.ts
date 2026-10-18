@@ -108,6 +108,7 @@ import {
 	inspectProjectPath,
 	listProjects,
 	openProject,
+	renameProject,
 	setProjectGroupEnabled,
 	setProjectSkillEnabled,
 	setProjectTrust,
@@ -446,6 +447,7 @@ const handlers: WsHandlers = {
 		closeProject(params.id);
 		return { ok: true } as const;
 	},
+	"project.rename": (params) => renameProject(params.id, params.name),
 	"project.setTrust": async (p) => {
 		const project = listProjects().find((candidate) => candidate.id === p.id);
 		if (!project) throw new Error(`Unknown project: ${p.id}`);

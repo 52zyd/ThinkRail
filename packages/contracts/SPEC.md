@@ -523,7 +523,10 @@ default, narrow cross-ring guards, and the quit-confirmation rule both clients d
   `host.update`; no output, arbitrary diagnostic, feed URL, artifact, platform path, or shell command crosses
   the wire.
 - **wsProtocol.ts** — `WS_METHODS` (`project.*` — incl. **`project.close`** (mark the stable record
-  closed without deleting associated state), **`project.inspect`** (classify a path) + **`project.init`**
+  closed without deleting associated state), **`project.rename`** (`{ id, name }` → the updated `Project`;
+  changes only the display `name` — path, slug, and id stay — and broadcasts the full `project.updated`;
+  `PROJECT_RENAME_PROTOCOL_VERSION` pins its v85 introduction so a newer client omits the action against
+  an older host), **`project.inspect`** (classify a path) + **`project.init`**
   (`git init` + commit, then open) + **`project.hasSpecs`** (lazy per-project "contains a registered
   spec?" for the Welcome screen — a full-tree walk, so requested only for the shown project,
   never eagerly for every project) / `workspace.*` — notably **`workspace.list { projectId,

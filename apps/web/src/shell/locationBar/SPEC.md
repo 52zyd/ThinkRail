@@ -78,7 +78,7 @@ branch. It renders what the store and `workspace.openReview` already report; it 
   dialog. While the active workspace is settled the caption reads **`Workspace · settled`** (the caption-
   fragment grammar `Branch · from base` already uses, in the warning tone), so a parked workspace you opened
   announces itself without a banner. Rename replaces the pill with the
-  chrome-less inline input used elsewhere and runs on the tree's shared `useWorkspaceRename` controller:
+  chrome-less inline input used elsewhere and runs on the tree's shared `useInlineRename` controller:
   Enter/blur commit, Escape cancels, unchanged or blank never requests, and a commit made while the socket's
   rename capability is unknown stays pending in the editor until a capable welcome restores it. The dispatch
   is bound to the workspace the edit started on, and because this segment is one persistent instance (the

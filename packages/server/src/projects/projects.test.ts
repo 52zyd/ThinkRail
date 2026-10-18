@@ -22,6 +22,7 @@ import {
 	listProjects,
 	listRecentProjects,
 	openProject,
+	renameProject,
 	revokeProjectMcpTool,
 	setPiTrustSeed,
 	setProjectMcpOverride,
@@ -283,6 +284,29 @@ test("closeProject rejects an unknown id instead of reporting a success with no 
 	setProjectPublisher((snapshot) => published.push(snapshot.id));
 	expect(() => closeProject("missing")).toThrow("Unknown project: missing");
 	expect(published).toEqual([]);
+});
+
+test("renameProject changes only the display name, publishes it, and survives close/reopen", () => {
+	const repo = join(dataDir, "repo");
+	makeRepo(repo);
+	const project = openProject(repo);
+	const published: string[] = [];
+	setProjectPublisher((snapshot) => published.push(snapshot.name));
+
+	const renamed = renameProject(project.id, "  My\n  Project  ");
+
+	expect(renamed).toMatchObject({
+		id: project.id,
+		name: "My Project",
+		path: project.path,
+		slug: project.slug,
+	});
+	expect(published).toEqual(["My Project"]);
+	closeProject(project.id);
+	expect(openProject(repo).name).toBe("My Project");
+	expect(() => renameProject(project.id, "   ")).toThrow("Invalid project name");
+	expect(() => renameProject(project.id, "x".repeat(101))).toThrow("Invalid project name");
+	expect(() => renameProject("missing", "Name")).toThrow("Unknown project: missing");
 });
 
 test("setProjectTrust: persists a revocable, fail-closed trust decision", () => {

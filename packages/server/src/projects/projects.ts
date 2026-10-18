@@ -141,6 +141,22 @@ export function closeProject(id: string): Project {
 	return project;
 }
 
+const PROJECT_NAME_MAX_LENGTH = 100;
+
+export function renameProject(id: string, requestedName: string): Project {
+	const name = requestedName.replace(/\s+/g, " ").trim();
+	if (!name || name.length > PROJECT_NAME_MAX_LENGTH)
+		throw new Error(`Invalid project name: ${requestedName}`);
+	const projects = getProjects();
+	const project = projects.find((candidate) => candidate.id === id);
+	if (!project) throw new Error(`Unknown project: ${id}`);
+	if (project.name === name) return project;
+	project.name = name;
+	saveProjects(projects);
+	emit(project);
+	return project;
+}
+
 export function setProjectTrust(
 	id: string,
 	trusted: boolean,

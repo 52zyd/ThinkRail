@@ -27,6 +27,7 @@ import {
 	normalizeSessionTitle,
 	PLAN_REVIEW_SUBAGENT_PROTOCOL_VERSION,
 	PLAN_SUMMARY_GENERATION_PROTOCOL_VERSION,
+	PROJECT_RENAME_PROTOCOL_VERSION,
 	PROJECT_TEMPLATE_PREVIEW_PROTOCOL_VERSION,
 	PROJECT_TRUST_PROTOCOL_VERSION,
 	PROTOCOL_VERSION,
@@ -195,6 +196,12 @@ test("the project trust summary and pi-level resource consent are pinned to v81"
 	expect(WS_METHODS.projectTrustSummary).toBe("project.trustSummary");
 });
 
+test("project rename is pinned to v85", () => {
+	expect(PROTOCOL_VERSION).toBe(85);
+	expect(PROJECT_RENAME_PROTOCOL_VERSION).toBe(85);
+	expect(WS_METHODS.projectRename).toBe("project.rename");
+});
+
 test("MCP server management, status and chat resources are pinned to v83", () => {
 	expect(MCP_PROTOCOL_VERSION).toBe(83);
 	expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(MCP_PROTOCOL_VERSION);
@@ -208,8 +215,8 @@ test("MCP server management, status and chat resources are pinned to v83", () =>
 });
 
 test("always-allowed MCP tools and their revoke are pinned to v84", () => {
-	expect(PROTOCOL_VERSION).toBe(84);
 	expect(MCP_TOOL_GRANTS_PROTOCOL_VERSION).toBe(84);
+	expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(MCP_TOOL_GRANTS_PROTOCOL_VERSION);
 	expect(WS_METHODS.mcpRevokeToolGrant).toBe("mcp.revokeToolGrant");
 });
 

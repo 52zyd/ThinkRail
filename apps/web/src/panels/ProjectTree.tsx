@@ -79,16 +79,18 @@ import {
 } from "./settledShelfNotice";
 import { useOpenProject } from "./useOpenProject";
 import {
+	canRenameProject,
 	canRenameWorkspace,
 	canSettleWorkspace,
 	loadProjectWorkspaces,
 	openWorkspaceIn,
+	renameProject,
 	renameWorkspace,
 	revealWorkspace,
 	settleWorkspace,
 	unsettleWorkspace,
 	useEditors,
-	useWorkspaceRename,
+	useInlineRename,
 } from "./workspaceActions";
 
 const CREATE_WORKSPACE_LABEL = `Create workspace (${platformShortcutLabel("N")} or ${platformShortcutLabel("N", { alt: true })})`;
@@ -294,6 +296,8 @@ export function ProjectTree() {
 								workspaceCount={(list ?? []).filter((w) => !isDefaultWorkspace(w)).length}
 								onToggle={() => toggleExpand(project.id)}
 								onSelect={() => void selectProject(project.id)}
+								canRename={canRenameProject(protocolVersion)}
+								onRename={(name) => renameProject(project, name)}
 								onClose={() => closeProject(project)}
 								onAddWorkspace={() => openWorkspaceDialog(project.id, false)}
 								onAddWorkspaceFromMenu={() => openWorkspaceDialog(project.id, true)}
@@ -468,6 +472,8 @@ function ProjectRow({
 	workspaceCount,
 	onToggle,
 	onSelect,
+	canRename,
+	onRename,
 	onClose,
 	onAddWorkspace,
 	onAddWorkspaceFromMenu,
@@ -483,6 +489,8 @@ function ProjectRow({
 	workspaceCount: number;
 	onToggle: () => void;
 	onSelect: () => void;
+	canRename: boolean;
+	onRename: (name: string) => void;
 	onClose: () => void;
 	onAddWorkspace: () => void;
 	onAddWorkspaceFromMenu: () => void;
@@ -496,6 +504,22 @@ function ProjectRow({
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const openingDialogRef = useRef(false);
 	const closeConfirmedRef = useRef(false);
+	const {
+		editing,
+		nameRef,
+		start: startRename,
+		inputProps: renameInputProps,
+	} = useInlineRename({
+		target: project,
+		canRename,
+		onRename: (_target, name) => onRename(name),
+	});
+	const folderIcon = isRunning ? (
+		<RunningIcon className={`size-14 ${isSelected ? "text-primary" : "text-text-muted"}`} />
+	) : (
+		<Folder className={`size-14 shrink-0 ${isSelected ? "text-primary" : "text-text-muted"}`} />
+	);
+	const nameClass = `truncate tr-text-ui ${isSelected ? "text-text-default" : "text-text-muted"}`;
 	const openDialogAfterMenu = (openDialog: () => void) => {
 		openingDialogRef.current = true;
 		setMenuOpen(false);
@@ -521,26 +545,32 @@ function ProjectRow({
 			>
 				<Chevron className="size-16" />
 			</button>
-			<button
-				ref={onRegisterNameButton}
-				type="button"
-				data-testid="project-name"
-				onClick={onSelect}
-				className="flex min-w-0 flex-1 items-center gap-4 text-left"
-			>
-				{isRunning ? (
-					<RunningIcon className={`size-14 ${isSelected ? "text-primary" : "text-text-muted"}`} />
-				) : (
-					<Folder
-						className={`size-14 shrink-0 ${isSelected ? "text-primary" : "text-text-muted"}`}
+			{editing ? (
+				<div className="flex min-w-0 flex-1 items-center gap-4">
+					{folderIcon}
+					<input
+						ref={nameRef}
+						data-testid="project-name-input"
+						type="text"
+						spellCheck={false}
+						aria-label="Project name"
+						defaultValue={project.name}
+						{...renameInputProps}
+						className={cn("w-full min-w-0 border-0 bg-transparent p-0 outline-none", nameClass)}
 					/>
-				)}
-				<span
-					className={`truncate tr-text-ui ${isSelected ? "text-text-default" : "text-text-muted"}`}
+				</div>
+			) : (
+				<button
+					ref={onRegisterNameButton}
+					type="button"
+					data-testid="project-name"
+					onClick={onSelect}
+					className="flex min-w-0 flex-1 items-center gap-4 text-left"
 				>
-					{project.name}
-				</span>
-			</button>
+					{folderIcon}
+					<span className={nameClass}>{project.name}</span>
+				</button>
+			)}
 			{needsAttention ? <AttentionDot /> : null}
 			{!isExpanded && workspaceCount > 0 && (
 				<span
@@ -613,6 +643,18 @@ function ProjectRow({
 						Open existing worktree…
 					</ContextMenuItem>
 					<ContextMenuSeparator />
+					{canRename ? (
+						<ContextMenuItem
+							data-testid="project-menu-rename"
+							onSelect={() => {
+								openingDialogRef.current = true;
+								startRename();
+							}}
+						>
+							<Pencil />
+							Rename
+						</ContextMenuItem>
+					) : null}
 					<ContextMenuItem
 						data-testid="project-menu-close"
 						onSelect={(event) => {
@@ -708,8 +750,8 @@ function WorkspaceRow({
 		start: startRename,
 		inputProps: renameInputProps,
 		onMenuCloseAutoFocus,
-	} = useWorkspaceRename({
-		workspace,
+	} = useInlineRename({
+		target: workspace,
 		canRename,
 		onRename: (_target, name) => onRename(name),
 	});

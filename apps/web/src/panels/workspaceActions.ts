@@ -1,5 +1,7 @@
 import {
 	type EditorInfo,
+	PROJECT_RENAME_PROTOCOL_VERSION,
+	type Project,
 	WORKSPACE_RENAME_PROTOCOL_VERSION,
 	type Workspace,
 } from "@thinkrail/contracts";
@@ -129,7 +131,7 @@ export function createRenameController<T>(options: {
 	};
 }
 
-export interface WorkspaceRename {
+export interface InlineRename {
 	editing: boolean;
 	nameRef: RefObject<HTMLInputElement | null>;
 	start(): void;
@@ -140,19 +142,21 @@ export interface WorkspaceRename {
 	onMenuCloseAutoFocus(event: Event): void;
 }
 
-type RenameControllerOptions = Parameters<typeof createRenameController<Workspace>>[0];
+type Renameable = { id: string; name: string };
 
-function useRenameController(options: RenameControllerOptions): RenameController<Workspace> {
+function useRenameController<T>(
+	options: Parameters<typeof createRenameController<T>>[0],
+): RenameController<T> {
 	const [controller] = useState(() => createRenameController(options));
 	return controller;
 }
 
-export function useWorkspaceRename(options: {
-	workspace: Workspace | null;
+export function useInlineRename<T extends Renameable>(options: {
+	target: T | null;
 	canRename: boolean;
-	onRename: (workspace: Workspace, name: string) => void;
-}): WorkspaceRename {
-	const { workspace, canRename, onRename } = options;
+	onRename: (target: T, name: string) => void;
+}): InlineRename {
+	const { target, canRename, onRename } = options;
 	const [editing, setEditing] = useState(false);
 	const nameRef = useRef<HTMLInputElement>(null);
 	const enterRenameRef = useRef(false);
@@ -160,16 +164,16 @@ export function useWorkspaceRename(options: {
 	useInsertionEffect(() => {
 		onRenameRef.current = onRename;
 	});
-	const controller = useRenameController({
+	const controller = useRenameController<T>({
 		canRename: false,
-		onRename: (target, name) => onRenameRef.current(target, name),
+		onRename: (renamed, name) => onRenameRef.current(renamed, name),
 		onEditingChange: setEditing,
 	});
 
-	const workspaceId = workspace?.id ?? null;
+	const targetId = target?.id ?? null;
 	useEffect(() => {
 		controller.reset();
-	}, [controller, workspaceId]);
+	}, [controller, targetId]);
 
 	useEffect(() => {
 		controller.setCanRename(canRename);
@@ -188,9 +192,9 @@ export function useWorkspaceRename(options: {
 		editing,
 		nameRef,
 		start() {
-			if (!workspace) return;
+			if (!target) return;
 			enterRenameRef.current = true;
-			controller.start(workspace, workspace.name);
+			controller.start(target, target.name);
 		},
 		inputProps: {
 			onBlur: (event) => controller.commit(event.currentTarget.value),
@@ -251,6 +255,16 @@ export function revealWorkspace(workspace: Workspace): void {
 	void getTransport()
 		.request("workspace.reveal", { id: workspace.id })
 		.catch((err) => toast.error(errorText(err, "Failed to reveal workspace")));
+}
+
+export function canRenameProject(protocolVersion: number | null): boolean {
+	return protocolVersion !== null && protocolVersion >= PROJECT_RENAME_PROTOCOL_VERSION;
+}
+
+export function renameProject(project: Project, name: string): void {
+	void getTransport()
+		.request("project.rename", { id: project.id, name })
+		.catch((err) => toast.error(errorText(err, "Failed to rename project")));
 }
 
 export function renameWorkspace(workspace: Workspace, name: string): void {

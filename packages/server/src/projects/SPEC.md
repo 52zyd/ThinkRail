@@ -29,7 +29,9 @@ bootstrap it into one so it can be opened.
   records migrate as open. **`openProject`** finds a known root even when closed, clears `closed`, bumps
   `lastOpened`, preserves its id, persists, and publishes the full snapshot; **`closeProject`** marks that
   same record closed and publishes it without deleting the project, repository, workspace records, or
-  live runtimes. **One cwd, one ThinkRail identity:** `openProject` rejects (named `ALREADY_OPEN`) a root already held as some
+  live runtimes. **`renameProject`** replaces only the display `name` (whitespace-collapsed, trimmed,
+  1–100 chars) and publishes the record; the folder-derived `slug`, `path`, and id never change, so
+  workspace paths and identity are unaffected and a reopen keeps the chosen name. **One cwd, one ThinkRail identity:** `openProject` rejects (named `ALREADY_OPEN`) a root already held as some
   workspace's `worktreePath` — pi keys chat transcripts by *directory*, so a second identity on an owned
   folder would serve that workspace's chats as its own and have them purged when either side is archived.
   Compared **canonically** (a managed worktree's stored path is composed, `--show-toplevel` answers
@@ -73,7 +75,7 @@ bootstrap it into one so it can be opened.
   leaving it untouched otherwise; `trusted: false` revokes both. A trust change persists and publishes the
   record, so every client shows the persisted trust even when the host request that made it then fails
   (an open chat could not reload).
-- **Public surface (barrel):** `openProject`, `listProjects`, `listRecentProjects`, `closeProject`,
+- **Public surface (barrel):** `openProject`, `listProjects`, `listRecentProjects`, `closeProject`, `renameProject`,
   `getProjects`, `setProjectPublisher`, `inspectProjectPath`, `initProject`, `setProjectTrust`,
   `setProjectSkillEnabled`, `setProjectGroupEnabled`, `acknowledgeProjectSkills`,
   `approveProjectMcpServer`, `setProjectMcpOverride`, `grantProjectMcpTool`, `revokeProjectMcpTool`,

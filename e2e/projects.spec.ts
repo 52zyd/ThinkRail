@@ -274,6 +274,40 @@ test("activating a workspace in one project keeps the other project's rail expan
 	await expect(fixtureExpand).toHaveAttribute("data-expanded", "true");
 });
 
+test("renaming a project from its context menu persists across reload and close/reopen", async ({
+	page,
+}) => {
+	await openFixtureProject(page);
+	const rail = page.getByTestId("project-tree");
+	const row = rail.getByTestId("project-item").first();
+	await expect(row.getByTestId("project-name")).toHaveText("sample-project");
+
+	await row.click({ button: "right" });
+	await page.getByTestId("project-menu-rename").click();
+	const input = row.getByTestId("project-name-input");
+	await expect(input).toBeFocused();
+	await input.press("Escape");
+	await expect(row.getByTestId("project-name")).toHaveText("sample-project");
+
+	await row.click({ button: "right" });
+	await page.getByTestId("project-menu-rename").click();
+	await expect(input).toBeFocused();
+	await input.fill("  Renamed Project  ");
+	await input.press("Enter");
+	await expect(row.getByTestId("project-name")).toHaveText("Renamed Project");
+
+	await page.reload();
+	await expect(rail.getByTestId("project-name").first()).toHaveText("Renamed Project");
+
+	await rail.getByTestId("project-item").first().click({ button: "right" });
+	await page.getByTestId("project-menu-close").click();
+	await page.getByTestId("confirm-close-project").click();
+	await expect(rail.getByTestId("project-item")).toHaveCount(0);
+	await page.getByTestId("add-project-menu").click();
+	await page.getByTestId("menu-open-project").click();
+	await expect(rail.getByTestId("project-name").first()).toHaveText("Renamed Project");
+});
+
 test("project context actions stay compact and close/reopen is lossless across clients", async ({
 	page,
 	context,
@@ -325,20 +359,25 @@ test("project context actions stay compact and close/reopen is lossless across c
 
 	const createFromMenu = page.getByTestId("project-menu-create-workspace");
 	const openExistingFromMenu = page.getByTestId("project-menu-open-existing-worktree");
+	const renameFromMenu = page.getByTestId("project-menu-rename");
 	const closeFromMenu = page.getByTestId("project-menu-close");
 	const menuParts = projectActions.locator('[role="menuitem"], [role="separator"]');
-	await expect(menuParts).toHaveCount(4);
+	await expect(menuParts).toHaveCount(5);
 	await expect(menuParts.nth(0)).toHaveText("Create workspace");
 	await expect(menuParts.nth(1)).toHaveText("Open existing worktree…");
 	await expect(menuParts.nth(2)).toHaveAttribute("role", "separator");
-	await expect(menuParts.nth(3)).toHaveText("Close project");
+	await expect(menuParts.nth(3)).toHaveText("Rename");
+	await expect(menuParts.nth(4)).toHaveText("Close project");
 	await expect(createFromMenu.locator("svg.remixicon")).toHaveCount(1);
 	await expect(openExistingFromMenu.locator("svg.remixicon")).toHaveCount(1);
+	await expect(renameFromMenu.locator("svg.remixicon")).toHaveCount(1);
 	await expect(closeFromMenu.locator("svg.remixicon")).toHaveCount(1);
 	await page.keyboard.press("ArrowDown");
 	await expect(createFromMenu).toBeFocused();
 	await page.keyboard.press("ArrowDown");
 	await expect(openExistingFromMenu).toBeFocused();
+	await page.keyboard.press("ArrowDown");
+	await expect(renameFromMenu).toBeFocused();
 	await page.keyboard.press("ArrowDown");
 	await expect(closeFromMenu).toBeFocused();
 	await page.keyboard.press("Escape");

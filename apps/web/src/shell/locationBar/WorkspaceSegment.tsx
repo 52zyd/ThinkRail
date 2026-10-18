@@ -38,7 +38,7 @@ import {
 	settleWorkspace,
 	unsettleWorkspace,
 	useEditors,
-	useWorkspaceRename,
+	useInlineRename,
 } from "../../panels/workspaceActions";
 import {
 	isDefaultWorkspace,
@@ -112,7 +112,7 @@ export function WorkspaceSegment({
 		start: startRename,
 		inputProps: renameInputProps,
 		onMenuCloseAutoFocus,
-	} = useWorkspaceRename({ workspace, canRename, onRename: renameWorkspace });
+	} = useInlineRename({ target: workspace, canRename, onRename: renameWorkspace });
 
 	const partition = useMemo(() => {
 		if (!menuOpen || siblings === undefined) return null;

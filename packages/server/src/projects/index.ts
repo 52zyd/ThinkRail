@@ -9,6 +9,7 @@ export {
 	listProjects,
 	listRecentProjects,
 	openProject,
+	renameProject,
 	revokeProjectMcpTool,
 	setPiTrustSeed,
 	setProjectGroupEnabled,

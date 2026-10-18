@@ -179,7 +179,7 @@ channel fan-out, and the process-boot wrapper both launchers share.
   params are not shape-validated at runtime. The registry includes `workspace.rename` as the direct manual door into
   `renameWorkspace(id, name)` (no `branch` option) — the workspaces module changes only the
   display label, persists, and publishes it, so the handler never mutates Git, emits, or patches a client
-  separately. The host's `resolveNewChatModel` composes AppConfig settings with the agent's settled available
+  separately; `project.rename` likewise delegates to the projects module's `renameProject`, which owns validation and the push. The host's `resolveNewChatModel` composes AppConfig settings with the agent's settled available
   model list and Pi thinking clamp; `model.default`, `session.create`, and newly-created review chats share
   that resolver, and creation passes its model and effort explicitly. A `session.create` that **named** a
   model and every `session.setModel` also record the resolved model as recent through `settings`'
