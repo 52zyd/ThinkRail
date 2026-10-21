@@ -122,6 +122,39 @@ export interface PrDraft {
 	body: string;
 }
 
+export type PrBodySource = "plan" | "commits" | "template" | "empty";
+
+export interface PrPreview extends PrDraft {
+	/** v87: worktree-relative PR/MR templates the host found, in discovery order. */
+	templates?: string[];
+	/** v87: whether the session (when one was given) has a plan body to render. */
+	planAvailable?: boolean;
+	/** v87: the source the body was rendered from. */
+	source?: PrBodySource;
+}
+
+export type ReviewProvider = "github" | "gitlab";
+
+/** `workspace.branchStatus`: where the branch stands against origin and its base, review or not. */
+export interface BranchStatus {
+	hasOrigin: boolean;
+	/** The forge `origin` points at; `null` without an origin or for any other host. */
+	provider: ReviewProvider | null;
+	/** The push repository has the branch; `null` when it couldn't be read (split origin, `ls-remote` failed). */
+	published: boolean | null;
+	/** Origin pushes to another URL than it fetches from: ahead/behind describe the push repository. */
+	pushesElsewhere: boolean;
+	/** Published only: local commits origin lacks. */
+	ahead?: number;
+	/** Published only: last-known origin commits HEAD lacks (the branch diverged). */
+	behind?: number;
+	/** Commits on HEAD that the workspace's base lacks. */
+	aheadOfBase: number;
+	/** The branch is its own base (Default on the default branch): no PR can be opened from it. */
+	onBase: boolean;
+	review: OpenBranchReview | null;
+}
+
 export interface OpenPrResult {
 	action: "created" | "updated" | "pushed" | "compare";
 	review?: OpenBranchReview;

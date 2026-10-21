@@ -249,6 +249,13 @@ default, narrow cross-ring guards, and the quit-confirmation rule both clients d
   **`OpenBranchReview`** (the review reference for the active branch: PR vs MR + number, plus an optional
   **`state`** — `"open" | "merged" | "closed"`, absent on a pre-v78 host and read as open — and
   **`changedAt`**, the ms time the provider merged or closed it; no actions),
+  **`BranchStatus`** (`workspace.branchStatus`'s answer, v87 `BRANCH_STATUS_PROTOCOL_VERSION`: `hasOrigin`,
+  `provider` (`"github" | "gitlab" | null`), `published` (the push repository has the branch; `null` when a split origin's push repository
+  couldn't be read), `pushesElsewhere` (origin's
+  push URL differs from its fetch URL, so `ahead` / `behind` describe the push repository), `ahead` / `behind` vs
+  `origin/<branch>` when published, `aheadOfBase`, `onBase` (the branch is its own base —
+  Default on the default branch) and `review: OpenBranchReview | null` — the facts the topbar's Remote and
+  Pull request segments derive their next action from, independent of whether a review exists),
   **`ExistingWorktreeCandidate`** (a `workspace.listExisting` row: absolute `path` + `branch`, or a
   `detached` row the chooser disables),
   `FileNode` (file-tree node; worktree-relative `/` path, `gitignored` set by the host when git ignores it),
@@ -587,7 +594,17 @@ default, narrow cross-ring guards, and the quit-confirmation rule both clients d
   this action omits it against an older host) / **`workspace.openReview`** (the active
   branch's optional `OpenBranchReview` metadata; optional `allowCached: true` permits a settled host
   cache hit while omission preserves the original force-fresh behavior for older independently shipped
-  clients; either form still joins a lookup already in flight) /
+  clients; either form still joins a lookup already in flight) / **`workspace.branchStatus`** (v87, same
+  params and freshness rules → `BranchStatus`; supersedes `openReview` for v87 clients, which stays for
+  older ones) / **`workspace.push`** (v87, `{ workspaceId, branch, confirmBase? }` → `{ dirtyFiles }`: publish or
+  push the branch to `origin` without touching any PR; a branch that is its own base is refused unless
+  `confirmBase: true`, and `branch` — the one the user saw and confirmed — must still be the live branch; `PUSH_AUTH_FAILED` as for `pr.open`) / **`pr.preview`** (v87 adds optional
+  `source: "plan" | "commits" | "template" | "empty"` and `template`, makes `sessionId` optional, and
+  returns the discovered `templates` and `planAvailable`; an older client's `{ sessionId }` call keeps the
+  plan body — `host` sends it `source: "plan"` explicitly, since a v87 source-less default may be `commits`) / **`pr.generate`** (v87, `{ workspaceId, sessionId?, template? }` → `{ body: string | null }`,
+  a best-effort one-shot draft; `null` when no model answered; `pr.open` v87 accepts no `sessionId` when
+  the caller supplies the `body`, and an optional `branch` — the branch the draft was composed for — that
+  must still be the live branch, as for `workspace.push`) /
   **`project.setTrust`** (persist a project's trust grant → the updated `Project`; gates its committed
   cross-agent skill aliases; `resources: true` also grants pi-level resource trust, see Project trust) /
   **`skill.list`** (a pre-session, skill-only `SlashCommandInfo[]` preview for a `projectId`, resolved from

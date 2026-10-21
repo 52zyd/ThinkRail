@@ -23,11 +23,37 @@ future pi extension exposes the same library to the agent.
 
 ## Behavior
 
-`previewPr({ workspaceId, sessionId, title? })` → `{ title, body }` (`pr.preview`): the exact
-title/body `openPr` would use (chat title falling back to the branch; `renderPrBody` over the wire
-plan), so the client's compose dialog can offer them for editing before anything is pushed.
+`previewPr({ workspaceId, sessionId?, title?, source?, template? })` → `{ title, body, templates,
+planAvailable, source }` (`pr.preview`): the exact title/body `openPr` would use, so the client's compose
+dialog can offer them for editing before anything is pushed. `source` picks the body: **`plan`**
+(`renderPrBody` over the session's wire plan, adopted commits included — the default whenever that plan
+has items; `planAvailable` reports whether it renders anything at all), **`commits`** (the subjects of `<base>..HEAD`, oldest first, as a
+bullet list — the default otherwise, so a plan-less or empty-plan PR still gets an honest body; `host`
+asks for `plan` explicitly on a session-backed preview from a pre-v87 client, which only ever saw the plan
+body), **`template`** (the chosen discovered template verbatim; the first one
+when `template` is absent), or **`empty`**. **Template discovery** reads the worktree, not the forge:
+GitHub's `pull_request_template.md` in `.github/`, the root, or `docs/` (any case) and every
+`.github/PULL_REQUEST_TEMPLATE/*.md`, plus GitLab's `.gitlab/merge_request_templates/*.md`; paths are
+worktree-relative, size-capped, and contained (the real path of each file, symlinks resolved, must sit
+inside the real worktree), and listed in that order.
 
-`openPr({ workspaceId, sessionId, title?, body?, draft? })`, one call = one idempotent attempt
+`prDraftInput({ workspaceId, sessionId?, template? })` → the bounded input `assist.suggestPrDescription`
+drafts from (`pr.generate`, composed in `host`): branch + base, commit subjects, `git diff --stat` against
+the base clamped to a fixed line budget, the session plan's rendered body when present, and the chosen
+template's text.
+
+`pushBranch({ workspaceId, branch, confirmBase? })` → `{ dirtyFiles }` (`workspace.push`): the safe-ref guard
+and `refreshUserOwnedWorkspace` revalidation before and after the dirty read — each time the live branch must
+still be the `branch` the request names (the one the user saw and confirmed), so a terminal switch in between
+pushes nothing instead of another branch — then the same `--set-upstream origin <branch>` push, env, and
+`PUSH_AUTH_FAILED` classification as step 2 below — one implementation that `openPr` also calls. A branch
+that IS its base is refused unless `confirmBase` is set (the client confirms first, naming the shared
+branch); it never reads, edits, or creates a PR, and drops the worktree's review cache like every push.
+
+`openPr({ workspaceId, sessionId?, title?, body?, draft? })` (`sessionId` only matters when `body` is
+absent: a session's PR is then refreshed from its plan body — source `plan` explicitly, never the
+preview default — so *Push updates* keeps a plan of adopted commits only in its structured form), one call =
+one idempotent attempt
 (`body` — the user-edited description from that dialog — replaces the rendered plan body verbatim
 when present; the title/body defaults come from ONE place — openPr consumes `previewPr`, so the
 previewed draft and the pushed PR can never diverge). The call opens with **`assertSafeRef(ws.branch)`**:
@@ -54,8 +80,14 @@ revalidates immediately after that await. Without both, a branch switched in a t
 read is in flight or moments before pressing Open PR would push/open/compare against the STALE persisted
 branch until the async watcher next catches up: the branch-sensitive `ws` is fresh, so the
 base guard, the push, the `gh` lookup/create, and the compare URL all derive from the one refreshed
-value. Then:
-1. No `origin` remote → throws (the client toasts it). Push failure → throws with git's stderr;
+value. When the request names a `branch` (the branch the client composed the draft for), both refreshes
+must still see it live, exactly like `pushBranch`: a checkout moved between composing and submitting
+pushes nothing rather than opening a PR for another branch with this one's title and body. Then:
+1. No `origin` remote → throws (the client toasts it). The forge (GitHub slug / GitLab project) is read from
+   origin's **configured push URL** (`remote.origin.pushurl`, else `remote.origin.url`, via `git`'s
+   `originUrls`), not the fetch URL, so a remote that pushes elsewhere than it fetches opens the review
+   where the branch actually landed; `insteadOf` rewrites are not expanded, since they map transports for
+   the same host. Push failure → throws with git's stderr;
    a stderr matching the non-interactive-auth signatures (`Permission denied (publickey)`,
    `could not read Username/Password`, `Authentication failed`, `terminal prompts disabled`,
    `Host key verification failed` — `isPushAuthFailure`) throws `CodedError("PUSH_AUTH_FAILED")`
@@ -74,8 +106,13 @@ value. Then:
    misreport it as an auth failure). When the host has a controlling tty, ssh would otherwise prompt
    for a key passphrase on `/dev/tty` and hang the whole call until the client times out — batch
    mode turns that hang into the immediate `Permission denied` the classification is built for.
-3. Non-GitHub origin (incl. local/bare test remotes) → `action: "pushed"` — the honest floor.
-4. GitHub origin: an existing open PR (`gh pr list --head <branch> --base <input.base>`, parsed by
+3. GitLab.com origin → `action: "compare"` with GitLab's prefilled new-MR page (`gitlabNewMrUrl`: source,
+   target, title, description capped like the GitHub compare body) — no `glab` mutation this iteration. Any
+   other origin (incl. local/bare test remotes) → `action: "pushed"` — the honest floor.
+4. GitHub origin: every `gh` call carries `--repo <slug>`, the push URL's repository — gh would otherwise
+   resolve the repository from the remote's fetch URL, so a split origin would look up, edit, or create the
+   PR on the repository that never received the branch. An existing open PR (`gh pr list --head <branch>
+   --base <input.base>`, parsed by
    `branch-review`'s `reviewNumber`) → `gh pr edit <NUMBER> --title --body` refresh → `action: "updated"` +
    **`bodyRefreshed`** (an edit failure is reported, never claimed as success). The edit selector is
    the NUMBER the list step just returned, never the branch positional — gh resolves a numeric
@@ -110,7 +147,7 @@ value. Then:
    strips it before the wire response. Capturing branch before the dirty-read await is unsound for
    user-owned checkouts because `openPr` deliberately refreshes after that await.
 
-The open-PR *read* side stays `workspace.openReview` (`branch-review`) — this module persists
+The open-PR *read* side stays `workspace.branchStatus` / `workspace.openReview` (`branch-review`) — this module persists
 nothing; the client re-derives button/chip state from that lookup plus this call's result. That
 lookup is cached, so every successful push drops the worktree's prior answer: pushing may change the
 branch's remote configuration even when the remote is not GitHub or the action falls back to compare.
@@ -119,9 +156,11 @@ an update, a create, or an ambiguous create result.
 
 ## Boundary
 
-- **Owns:** the push + PR action, PR-body rendering from the wire plan, GitHub slug/compare-URL
-  derivation.
-- **Public surface (barrel):** `openPr`, `previewPr`.
+- **Owns:** the push (with or without a PR) + PR action, PR-body rendering from the wire plan, commit and
+  template body sources, PR/MR template discovery, the generation input, GitHub slug/compare-URL derivation.
+- **Public surface (barrel):** `openPr`, `previewPr`, `pushBranch`, `prDraftInput`, `onBaseBranch`.
+- `onBaseBranch` is the one "the branch is its own base" check, shared with `host`'s
+  `workspace.branchStatus`.
 - **Allowed deps:** `workspaces` (workspace record, `refreshUserOwnedWorkspace`), `git` (exec + status), `todos` (`listTodos` for
   the body), `branch-review` (provider detection, existing-PR lookup, the shared command runner,
   `forgetOpenBranchReview`),
