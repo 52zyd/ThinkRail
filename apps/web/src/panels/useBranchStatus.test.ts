@@ -1,11 +1,18 @@
 import { expect, test } from "bun:test";
-import { type BranchAnswer, createBranchStatusState } from "./branchStatusState";
+import {
+	type BranchAnswer,
+	CI_DISCOVERY_POLLS,
+	createBranchStatusState,
+} from "./branchStatusState";
 import {
 	branchAnswer,
+	CI_POLL_INTERVAL_MS,
+	ciPollWanted,
 	isOpenBranchReview,
 	openReviewLabel,
 	resolveBranchReview,
 	startBranchStatusSync,
+	startCiPoll,
 } from "./useBranchStatus";
 
 test("formats provider-native review references", () => {
@@ -43,6 +50,13 @@ test("the v78 snapshot owns review state while a matching lookup contributes liv
 		review: null,
 		detailsKnown: false,
 	});
+	const details = { draft: true, reviewers: [], mergeState: "draft" } as const;
+	expect(resolveBranchReview({ ...snapshot, details }, snapshot, true).review?.details).toBe(
+		details,
+	);
+	expect(
+		resolveBranchReview({ ...snapshot, number: 2, details }, snapshot, true).review?.details,
+	).toBeUndefined();
 });
 
 test("only an open review (or a pre-v78 one without state) is an open review for PR actions", () => {
@@ -146,4 +160,92 @@ test("a v87 branch status folds its counts onto the review and keeps the facts r
 		status: { ...base, ahead: 2, behind: 1 },
 	});
 	expect(branchAnswer({ ...base, ahead: 0, behind: 0, review }).review).toEqual(review);
+});
+
+test("a CI poll reads the review fresh but skips the fetch, and only while connected", () => {
+	const calls: unknown[] = [];
+	const controller = startBranchStatusSync({
+		workspaceId: "w1",
+		key: "w1\0poll",
+		state: createBranchStatusState(),
+		focusTarget: new EventTarget(),
+		connected: false,
+		request: (params) => {
+			calls.push(params);
+			return new Promise(() => {});
+		},
+	});
+	controller.poll();
+	expect(calls).toEqual([]);
+	controller.setConnected(true);
+	controller.poll();
+	expect(calls).toEqual([
+		{ workspaceId: "w1", allowCached: true },
+		{ workspaceId: "w1", skipFetch: true },
+	]);
+	controller.stop();
+});
+
+test("the CI poll ticks every 20 s, skips hidden windows, and stops cleanly", () => {
+	const ticks: Array<() => void> = [];
+	let interval = 0;
+	let cleared = false;
+	let visible = true;
+	let polls = 0;
+	const stop = startCiPoll({
+		poll: () => {
+			polls += 1;
+		},
+		visible: () => visible,
+		setInterval: (run, ms) => {
+			ticks.push(run);
+			interval = ms;
+			return 7;
+		},
+		clearInterval: (handle) => {
+			cleared = handle === 7;
+		},
+	});
+	expect(interval).toBe(CI_POLL_INTERVAL_MS);
+	expect(CI_POLL_INTERVAL_MS).toBe(20_000);
+	ticks[0]?.();
+	visible = false;
+	ticks[0]?.();
+	expect(polls).toBe(1);
+	stop();
+	expect(cleared).toBe(true);
+});
+
+test("an open PR polls while checks run, and for a few polls after an action before any appear", () => {
+	const review = (pending: number | null, state: "open" | "merged" = "open") => ({
+		kind: "pull-request" as const,
+		number: 1,
+		state,
+		details: {
+			draft: false,
+			reviewers: [],
+			mergeState: "unknown" as const,
+			...(pending === null
+				? {}
+				: { checks: { passing: 1, pending, failing: 0, failingNames: [] } }),
+		},
+	});
+	expect(ciPollWanted({ review: review(2) })).toBe(true);
+	expect(ciPollWanted({ review: review(0) })).toBe(false);
+	expect(ciPollWanted({ review: review(null) })).toBe(false);
+	expect(ciPollWanted({ review: review(null), discovery: 1 })).toBe(true);
+	expect(ciPollWanted({ review: review(2, "merged") })).toBe(false);
+	expect(ciPollWanted({ review: { kind: "pull-request", number: 1 }, discovery: 3 })).toBe(false);
+	expect(ciPollWanted(null)).toBe(false);
+
+	const state = createBranchStatusState();
+	const key = "w1\0discovery";
+	state.resolveRequest(key, state.beginRequest(key), { review: review(null), status: null });
+	state.startDiscovery(key);
+	expect(state.getSnapshot(key)?.discovery).toBe(CI_DISCOVERY_POLLS);
+	state.resolveRequest(key, state.beginRequest(key), { review: review(0), status: null });
+	expect(state.getSnapshot(key)?.discovery).toBe(CI_DISCOVERY_POLLS);
+	for (let poll = 0; poll < CI_DISCOVERY_POLLS; poll += 1) state.spendDiscovery(key);
+	expect(state.getSnapshot(key)?.discovery).toBeUndefined();
+	expect(ciPollWanted(state.getSnapshot(key))).toBe(false);
 });

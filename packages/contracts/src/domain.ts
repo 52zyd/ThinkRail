@@ -113,6 +113,57 @@ export interface OpenBranchReview {
 	 * this does not imply the checkout rewrote history or that a force-push is appropriate.
 	 */
 	behindCommits?: number;
+	/** v88 `workspace.branchStatus` only: an open GitHub PR's live review facts. Never in the host snapshot. */
+	details?: ReviewDetails;
+}
+
+export type ReviewDecision = "approved" | "changes_requested" | "review_required";
+
+/** GitHub's `mergeStateStatus`, lower-cased. */
+export type ReviewMergeState =
+	| "clean"
+	| "unstable"
+	| "has_hooks"
+	| "blocked"
+	| "behind"
+	| "dirty"
+	| "draft"
+	| "unknown";
+
+export type MergeMethod = "squash" | "merge" | "rebase";
+
+export interface ReviewChecks {
+	passing: number;
+	pending: number;
+	failing: number;
+	/** Bounded, in the provider's order. */
+	failingNames: string[];
+}
+
+export interface ReviewDetails {
+	draft: boolean;
+	/** The branch the PR merges into now — it may have been retargeted since the workspace was made. */
+	base?: string;
+	/** Absent when the PR has no checks. */
+	checks?: ReviewChecks;
+	/** Absent when the repository requires no review and nobody decided. */
+	reviewDecision?: ReviewDecision;
+	/** Latest approving / change-requesting reviewers, bounded. */
+	reviewers: { login: string; state: "approved" | "changes_requested" }[];
+	mergeState: ReviewMergeState;
+	/** What the repository allows; absent when `gh repo view` did not answer. */
+	mergeMethods?: MergeMethod[];
+	/** The repository deletes head branches on merge itself. */
+	deleteBranchOnMerge?: boolean;
+}
+
+export interface MergePrResult {
+	/** `false` when GitHub queued the PR (merge queue / auto-merge) instead of merging it now. */
+	merged: boolean;
+	/** `deleteBranch` only: whether `origin/<branch>` is gone — never deleted for a queued PR. */
+	branchDeleted: boolean;
+	/** Why the deletion after a successful merge failed. */
+	deleteError?: string;
 }
 
 export type GhSetupProblem = "missing" | "unauthenticated";

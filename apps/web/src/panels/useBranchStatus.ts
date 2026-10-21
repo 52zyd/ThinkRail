@@ -10,11 +10,14 @@ import { type ConnectionStatus, getTransport } from "../transport";
 import {
 	type BranchAnswer,
 	type BranchFacts,
+	type BranchStatusSnapshot,
 	type BranchStatusStateStore,
 	branchStatusState,
 } from "./branchStatusState";
 
-type BranchStatusRequestParams = { workspaceId: string; allowCached?: true };
+type BranchStatusRequestParams = { workspaceId: string; allowCached?: true; skipFetch?: true };
+
+export const CI_POLL_INTERVAL_MS = 20_000;
 type BranchStatusRequest = (params: BranchStatusRequestParams) => Promise<BranchAnswer>;
 
 export interface BranchStatusHookState {
@@ -29,6 +32,7 @@ function requestBranchStatus(options: {
 	workspaceId: string;
 	key: string;
 	allowCached: boolean;
+	skipFetch?: boolean;
 	request: BranchStatusRequest;
 	state: BranchStatusStateStore;
 }): void {
@@ -37,6 +41,7 @@ function requestBranchStatus(options: {
 		.request({
 			workspaceId: options.workspaceId,
 			...(options.allowCached ? { allowCached: true as const } : {}),
+			...(options.skipFetch ? { skipFetch: true as const } : {}),
 		})
 		.then(
 			(answer) => {
@@ -59,18 +64,23 @@ export function startBranchStatusSync(options: {
 	setConnected: (connected: boolean) => void;
 	refresh: () => void;
 	reload: () => void;
+	poll: () => void;
 	stop: () => void;
 } {
 	let connected = options.connected;
 	let freshOnReconnect = false;
-	const load = (allowCached: boolean) =>
+	const load = (allowCached: boolean, skipFetch = false) =>
 		requestBranchStatus({
 			workspaceId: options.workspaceId,
 			key: options.key,
 			allowCached,
+			skipFetch,
 			request: options.request,
 			state: options.state,
 		});
+	const poll = () => {
+		if (connected) load(false, true);
+	};
 	const refresh = () => {
 		if (connected) load(false);
 		else freshOnReconnect = true;
@@ -89,7 +99,30 @@ export function startBranchStatusSync(options: {
 
 	if (connected) load(true);
 	options.focusTarget.addEventListener("focus", refresh);
-	return { setConnected, refresh, reload, stop };
+	return { setConnected, refresh, reload, poll, stop };
+}
+
+export function startCiPoll(options: {
+	poll: () => void;
+	visible: () => boolean;
+	intervalMs?: number;
+	setInterval?: (run: () => void, ms: number) => unknown;
+	clearInterval?: (handle: unknown) => void;
+}): () => void {
+	const every = options.setInterval ?? ((run, ms) => globalThis.setInterval(run, ms));
+	const clear =
+		options.clearInterval ??
+		((handle) => globalThis.clearInterval(handle as ReturnType<typeof setInterval>));
+	const handle = every(() => {
+		if (options.visible()) options.poll();
+	}, options.intervalMs ?? CI_POLL_INTERVAL_MS);
+	return () => clear(handle);
+}
+
+export function ciPollWanted(snapshot: BranchStatusSnapshot | null): boolean {
+	const review = snapshot?.review;
+	if (!review || !isOpenBranchReview(review) || !review.details) return false;
+	return (review.details.checks?.pending ?? 0) > 0 || (snapshot.discovery ?? 0) > 0;
 }
 
 export function supportsBranchStatus(protocolVersion: number | null): boolean {
@@ -123,6 +156,7 @@ type BranchStatusSync = ReturnType<typeof startBranchStatusSync>;
 export function useBranchStatus(
 	workspace: Workspace | null,
 	status: ConnectionStatus,
+	options: { pollChecks?: boolean } = {},
 ): BranchStatusHookState {
 	const workspaceId = workspace?.id ?? null;
 	const key = workspace ? `${workspace.id}\0${workspace.branch}` : null;
@@ -178,6 +212,18 @@ export function useBranchStatus(
 		sync.current?.reload();
 	}, [fsTick, key, workspaceId]);
 
+	const pollChecks = options.pollChecks === true && connected && ciPollWanted(loaded);
+	useEffect(() => {
+		if (!pollChecks || !key) return;
+		return startCiPoll({
+			poll: () => {
+				branchStatusState.spendDiscovery(key);
+				sync.current?.poll();
+			},
+			visible: () => document.visibilityState === "visible",
+		});
+	}, [pollChecks, key]);
+
 	const noteOpenReview = useCallback(
 		(review: OpenBranchReview, url?: string) => {
 			if (key && currentKey.current === key) branchStatusState.noteOpenReview(key, review, url);
@@ -185,7 +231,9 @@ export function useBranchStatus(
 		[key],
 	);
 	const refreshBranchStatus = useCallback(() => {
-		if (key && currentKey.current === key) sync.current?.refresh();
+		if (!key || currentKey.current !== key) return;
+		branchStatusState.startDiscovery(key);
+		sync.current?.refresh();
 	}, [key]);
 
 	const current = connected ? loaded : null;
@@ -219,6 +267,7 @@ export function resolveBranchReview(
 			...(lookup.url ? { url: lookup.url } : {}),
 			...(lookup.unpushedCommits !== undefined ? { unpushedCommits: lookup.unpushedCommits } : {}),
 			...(lookup.behindCommits !== undefined ? { behindCommits: lookup.behindCommits } : {}),
+			...(lookup.details ? { details: lookup.details } : {}),
 		},
 		detailsKnown: true,
 	};

@@ -2,7 +2,7 @@
 id: submodule-server-pr
 type: submodule-design
 status: draft
-title: pr — push the workspace branch and open/update its GitHub PR
+title: pr — push the workspace branch, open/update its GitHub PR, and act on it
 parent: module-server
 depends-on: [submodule-server-branch-review, submodule-server-todos, submodule-server-github]
 implements: [task-open-pr]
@@ -147,6 +147,37 @@ pushes nothing rather than opening a PR for another branch with this one's title
    strips it before the wire response. Capturing branch before the dirty-read await is unsound for
    user-owned checkouts because `openPr` deliberately refreshes after that await.
 
+**Review actions** (`reviewActions.ts`, v88): `readyPr` (`pr.ready`), `reopenPr` (`pr.reopen`),
+`mergePr({ …, method, deleteBranch })` (`pr.merge`) and `deleteRemoteBranch` (`workspace.deleteRemoteBranch`).
+Every PR mutation is bound to what the user saw: the refreshed live branch must still be the request's
+`branch` (a terminal switch changes nothing) and must not be its own base, and `gh pr view <number>`
+must still show that number heading this branch **from origin's own repository** (`headRepositoryOwner`
+/ `headRepository` against the slug of origin's push URL) in the state the action needs (open for
+ready/merge, closed for reopen). `gh pr list --head` matches by branch name alone, so a fork's PR from a
+same-named branch (`contributor:main`, `patch-1`) is otherwise indistinguishable — and the base-branch
+refusal keeps the Default workspace on `main` from ever acting on one. The merge passes
+**`--match-head-commit <HEAD>`** so GitHub merges exactly the head the user looked at (the client offers
+Merge only while the branch matches origin), then re-reads the PR: `gh pr merge` also exits 0 when a merge
+queue or auto-merge only **queued** it, so `MergePrResult.merged` reports the state GitHub shows and the
+branch is deleted only after a real merge — deleting a queued PR's head branch would close it. Mutations run under the 60 s timeout through
+the injected runner, surface gh's stderr when refused, and drop the worktree's review cache whatever the
+outcome. Like `openPr`'s gh flow, every review-action `gh` call carries **`--repo <push slug>`**: the branch
+is deleted from the push repository, so the PR it is checked against must live there too — gh alone
+resolves the fetch repository, which on a split origin is another repository's PRs. **The remote branch is deleted with git, never `gh pr merge --delete-branch`**: gh would also
+delete the local branch and switch the checkout — fatal for a worktree and for the user's own checkout.
+Both paths run `git push --force-with-lease=refs/heads/<branch>:<tip> origin --delete refs/heads/<branch>`
+(the full ref, so a same-named tag is never the one deleted) through `pushOrigin`, the one push helper
+(`pushGitEnv` + `PUSH_AUTH_FAILED`) `pushToOrigin` also uses. The lease names the tip the deletion was
+validated against — the merged HEAD after a merge, the remote-tracking `origin/<branch>` for a standalone
+deletion, which must also be contained in HEAD — so a commit someone pushed in between is never the
+remote's only copy to be deleted: the lease rejects and nothing is deleted. A rejected lease whose ref is
+already gone (`ls-remote` on the push URL) counts as deleted — GitHub's own auto-delete may have won. After a successful merge a failed deletion is reported in `MergePrResult.deleteError`, not
+thrown. Before either deletion, `gh pr list --repo <push slug> --head <branch> --state open` must answer
+that no open PR there is headed by this branch from that repository (a fork's same-named PR is not):
+deleting a PR's head branch closes it, and an unanswered check deletes nothing. A non-GitHub origin uses
+the fresh `branch-review` lookup instead, with the same unanswered-means-refuse rule. The standalone
+deletion also refuses the base branch.
+
 The open-PR *read* side stays `workspace.branchStatus` / `workspace.openReview` (`branch-review`) — this module persists
 nothing; the client re-derives button/chip state from that lookup plus this call's result. That
 lookup is cached, so every successful push drops the worktree's prior answer: pushing may change the
@@ -156,14 +187,16 @@ an update, a create, or an ambiguous create result.
 
 ## Boundary
 
-- **Owns:** the push (with or without a PR) + PR action, PR-body rendering from the wire plan, commit and
-  template body sources, PR/MR template discovery, the generation input, GitHub slug/compare-URL derivation.
-- **Public surface (barrel):** `openPr`, `previewPr`, `pushBranch`, `prDraftInput`, `onBaseBranch`.
+- **Owns:** the push (with or without a PR) + PR action, the GitHub review mutations (ready, merge,
+  reopen) and remote-branch deletion, PR-body rendering from the wire plan, commit and template body
+  sources, PR/MR template discovery, the generation input, GitHub slug/compare-URL derivation.
+- **Public surface (barrel):** `openPr`, `previewPr`, `pushBranch`, `prDraftInput`, `onBaseBranch`,
+  `readyPr`, `mergePr`, `reopenPr`, `deleteRemoteBranch`.
 - `onBaseBranch` is the one "the branch is its own base" check, shared with `host`'s
   `workspace.branchStatus`.
 - **Allowed deps:** `workspaces` (workspace record, `refreshUserOwnedWorkspace`), `git` (exec + status), `todos` (`listTodos` for
-  the body), `branch-review` (provider detection, existing-PR lookup, the shared command runner,
-  `forgetOpenBranchReview`),
+  the body), `branch-review` (provider detection, `githubSlug`, existing-PR lookup, the fresh open-review
+  check before a remote deletion, the shared command runner, `forgetOpenBranchReview`),
   `github` (`ghSetupProblem` — the named compare-fallback reason); `contracts` types;
   `shared/codedError` (`PUSH_AUTH_FAILED`).
 - **Forbidden:** `host`; provider HTTP APIs or stored tokens (auth stays external — the user's `gh`

@@ -113,7 +113,17 @@ import {
 import { githubAuthStatus, githubRefresh } from "../github";
 import { clampLimit, getHistoryIndex } from "../history";
 import { logger } from "../log";
-import { onBaseBranch, openPr, prDraftInput, previewPr, pushBranch } from "../pr";
+import {
+	deleteRemoteBranch,
+	mergePr,
+	onBaseBranch,
+	openPr,
+	prDraftInput,
+	previewPr,
+	pushBranch,
+	readyPr,
+	reopenPr,
+} from "../pr";
 import {
 	acknowledgeProjectSkills,
 	closeProject,
@@ -536,8 +546,9 @@ const handlers: WsHandlers = {
 		if (outcome.reliable) setWorkspaceReview(ws.id, outcome.value, ws.branch);
 		const review = openReviewForClient(outcome.value, ctx.protocolVersion);
 		if (!review) return review;
+		const { details: _details, ...reference } = review;
 		return {
-			...review,
+			...reference,
 			...(divergence && divergence.ahead > 0 ? { unpushedCommits: divergence.ahead } : {}),
 			...(divergence && divergence.behind > 0 ? { behindCommits: divergence.behind } : {}),
 		};
@@ -551,7 +562,9 @@ const handlers: WsHandlers = {
 			findBranchReviewOutcome(ws.worktreePath, ws.branch, { fresh }),
 			(splitPushUrl
 				? countPushTargetDivergence(ws.worktreePath, ws.branch, splitPushUrl)
-				: countPushDivergence(ws.worktreePath, ws.branch, { fetch: fresh }).then(
+				: countPushDivergence(ws.worktreePath, ws.branch, {
+						fetch: fresh && p.skipFetch !== true,
+					}).then(
 						(divergence): PushTargetStatus =>
 							divergence ? { published: true, ...divergence } : { published: false },
 					)
@@ -577,6 +590,11 @@ const handlers: WsHandlers = {
 	"workspace.push": async (p) => {
 		recordWorkspaceActivity(p.workspaceId);
 		return pushBranch(p);
+	},
+	"workspace.deleteRemoteBranch": async (p) => {
+		recordWorkspaceActivity(p.workspaceId);
+		await deleteRemoteBranch(p);
+		return { ok: true } as const;
 	},
 	"workspace.settle": (params) => settleWorkspace(params.id),
 	"workspace.unsettle": (params) => unsettleWorkspace(params.id),
@@ -627,6 +645,20 @@ const handlers: WsHandlers = {
 	"pr.generate": async (params) => ({
 		body: await suggestPrDescription(await prDraftInput(params)),
 	}),
+	"pr.ready": async (p) => {
+		recordWorkspaceActivity(p.workspaceId);
+		await readyPr(p);
+		return { ok: true } as const;
+	},
+	"pr.merge": (p) => {
+		recordWorkspaceActivity(p.workspaceId);
+		return mergePr(p);
+	},
+	"pr.reopen": async (p) => {
+		recordWorkspaceActivity(p.workspaceId);
+		await reopenPr(p);
+		return { ok: true } as const;
+	},
 	"pr.open": async (p) => {
 		refreshUserOwnedWorkspace(p.workspaceId);
 		recordWorkspaceActivity(p.workspaceId);
