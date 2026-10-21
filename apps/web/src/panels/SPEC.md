@@ -1502,7 +1502,16 @@ own section. The kebab menu (`plan-menu`, a
   uncommented file shows neither. There is no manual review mode to enter. Every send affordance (composer Send now, thread cards, sidebar rows/footer, tab
   Send all) goes through the one `reviewSend.ts` pair (`sendReviewComment`/`sendReviewBatch`: request
   → show the chat tab → toast on failure), and the panes integrate via the one **`useFileReview`** hook,
-  passing its anchor-keyed `worktree`/`base` surfaces through the registry props.
+  passing its anchor-keyed `worktree`/`base` surfaces through the registry props. The hook keeps a file's thread
+  arrays, and with them both surfaces, while their threads are unchanged (`sameThreads`): every review push
+  replaces the workspace's comment list, and rebuilding each open file's threads from it handed every mounted
+  renderer a new `review`. Monaco, which the compiler skips, re-rendered twice for one comment on another
+  file (`e2e/perf/reviewThreadIsolation.perf.ts` pins it at zero). The pair, the hook and
+  `SendReviewButton` take an optional chat session id: without it a send targets the last open chat (else
+  the file's pinned review chat); with it — a file shown in a chat tool card, whose `ResourcePreview` reads
+  the chat's scope — the host's explicit `sessionId` wins over the pinned chat, so feedback lands in the chat
+  that showed the file. The shell's `AppResourceHost` exposes exactly these (bound per call) as the
+  renderers' `FileReview` / `ReviewSend` host capabilities.
   A batch answers with EVERY session it touched (one per group), so a multi-file batch opens every chat
   it started and focuses the first — a chat the user never saw would still be an agent working on their
   comments. **Showing each chat forks on the result's `reused` flag:** a chat this send CREATED opens straight
@@ -1813,16 +1822,9 @@ own section. The kebab menu (`plan-menu`, a
   is chosen in the Changes header and is part of the tab's identity), the file / `+ −` totals with the
   viewed count, *Collapse all* / *Expand all*, and `Send review (N)` over the workspace's drafts.
 
-  **Wide rewrites wait behind a notice.** Source diffs run on the main thread, and that cost
-  tracks the number of changed lines, not the file size: a 10 MB all-added file diffs in ~0.1 s while ~10k
-  changed lines take over 20 s. Before mounting a renderer, `DiffSurfaceBody` estimates the changed lines
-  (`largeDiff.ts`: the linear multiset difference of the two sides' lines). Above
-  `LARGE_DIFF_CHANGED_LINES` (2000, about a second of diffing), or when an order-sensitive check cannot
-  finish within 50 ms / 2000 edits, it shows `diff-too-large` with **Show diff anyway** (per surface mount)
-  and, when a worktree-backed modified side exists, **Open file** into the desktop editor. A one-sided
-  diff (added or deleted file) is never guarded: it costs no diffing. The bounded check closes the multiset estimate's
-  blind spot for reordered lines. Both guards show “This diff is too expensive to show automatically”
-  without a line count; the guard returns only whether automatic rendering should wait.
+  **Wide rewrites wait behind a notice.** `DiffSurfaceBody` mounts its renderer through
+  [[module-resource-renderers]]' `GuardedRendererDiff` (the policy and its thresholds live there), adding
+  **Open file** into the desktop editor to the notice when a worktree-backed modified side exists.
 
   The bundled candidates and their behavior (code, markdown, binary, LFS, image, SVG, CSV, JSON, notebook,
   PDF, HTML, Pierre virtualization) are owned by [[module-resource-renderers]]; the panes only dispatch,
@@ -1916,6 +1918,17 @@ own section. The kebab menu (`plan-menu`, a
   would overflow the chip **invisibly to the layout** while spilling over the buttons on screen, so the
   basename pairs it with `max-w-full`: flex never steals the name's width, but max-width still clamps it to
   the row, which is also why the e2e pin measures the *chip's* `scrollWidth`, not the header's.
+- **A diff tab can compare two workspace files.** `DiffTab` is a union — `GitDiffTab` (a git scope with its
+  loaded sides) or `FileComparisonTab` (a `before` path and no git fields at all) — and so is its persisted
+  `LayoutDiffTab`; `isFileComparison(tab)` is the one predicate. `openFileComparisonInTab` opens a comparison
+  (identity `compare:<before>:<path>`, named `before → after`), and `DiffPane` forks on it: a comparison renders
+  [[module-resource-renderers]]' `ResourcePreview` (both files read live from disk, no revert/hunk actions,
+  comments on the two files' worktree anchors, Split/Inline, renderer and view state on the tab) instead of the
+  git-backed `DiffSurface`. A comparison has no scope to misread, so the compiler finds every git-only reader
+  (`GitDiffPane`, the Changes panel's active-diff match, `updateDiffTabContent`, whitespace, reload hydration
+  — which installs a comparison without a `git.diffFile` read); an earlier revision gave it a placeholder
+  `uncommitted` scope and left each reader to remember a `before` check. Its review flag and the Review
+  panel's active path cover both files (`tabReviewPaths`).
 - **File tabs use the same renderer dispatch as diffs.** `FilePane` describes the first `fs.readFile`
   metadata (provisionally text before it lands — and permanently text against a host that predates
   `RESOURCE_META_PROTOCOL_VERSION` and never sends `meta`, which is that host's own legacy surface, so no

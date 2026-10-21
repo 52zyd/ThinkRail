@@ -9,7 +9,11 @@ import {
 } from "@remixicon/react";
 import type { GitDiffScope, GitFileChange } from "@thinkrail/contracts";
 import type { HunkTriage, ReviewDraftPersistence } from "@thinkrail/resource-renderers";
-import { ReviewDraftContext } from "@thinkrail/resource-renderers";
+import {
+	RendererToggles,
+	ReviewDraftContext,
+	rendererImplementationKey,
+} from "@thinkrail/resource-renderers";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -17,7 +21,6 @@ import {
 	DropdownMenuTrigger,
 } from "@thinkrail/ui/dropdown-menu";
 import { LoadingRegion } from "@thinkrail/ui/skeleton";
-import { ToggleSegment } from "@thinkrail/ui/toggle-segment";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { copyText, isPhoneViewport } from "@/lib";
 import { statusLetter } from "../chat/planView";
@@ -40,7 +43,6 @@ import { DiffStatBadge } from "./DiffStatBadge";
 import { DiffSurfaceBody, useDiffSurface } from "./DiffSurface";
 import { HeaderIconButton } from "./HeaderIconButton";
 import { openDiffInTab } from "./openTabs";
-import { rendererImplementationKey, rendererTestId } from "./resourcePane";
 import type { SectionContent, SectionContentCache } from "./sectionContentCache";
 import { useLiveTabContent } from "./useLiveTabContent";
 
@@ -268,17 +270,13 @@ export const ChangesFileSection = memo(function ChangesFileSection({
 					</span>
 				) : null}
 				<span className="ml-auto flex shrink-0 items-center gap-4">
-					{content && candidates.length >= 2
-						? candidates.map((candidate) => (
-								<ToggleSegment
-									key={candidate.id}
-									testid={rendererTestId(candidate.id)}
-									label={candidate.label}
-									active={candidate.id === renderer.id}
-									onClick={() => selectRenderer(candidate.id)}
-								/>
-							))
-						: null}
+					{content ? (
+						<RendererToggles
+							candidates={candidates}
+							renderer={renderer}
+							onRendererId={selectRenderer}
+						/>
+					) : null}
 					{hunkActions ? (
 						<HeaderIconButton
 							testid="changes-section-revert"

@@ -16,21 +16,54 @@ image, SVG, CSV, JSON, notebook, PDF, HTML) with their review composers, thread 
 and the shared Monaco, Pierre and markdown-document machinery they run on. It is presentation: it owns no
 content loading, review persistence, tabs or navigation — a host supplies those.
 
-The package exists so one renderer stack serves every surface that shows a file. The web app's file and
-diff panes consume it today, so a renderer fix lands everywhere at once.
+The package exists so one renderer stack serves every surface that shows a file: the web app's file and
+diff panes, the file-comparison diff tab, and extension tool cards (visualize's file previews,
+[[module-ext-visualize]]), so a renderer fix lands everywhere at once.
 
 ## Public surface
 
-One barrel, `@thinkrail/resource-renderers` (`src/index.ts`): the registry contract (types,
-`registerResourceRenderer`, `resolveRenderers`, `describeResource`, `anchorLabel`, `isPlaceable`,
-`threadLabel`, `outdatedReason`), `registerBundledResourceRenderers()` (idempotent), the host seam
-(`ResourceHostProvider`, `ResourcePreferencesProvider` and the `ResourceHost`, `ResourcePreferences`,
-`ResourceMarkdown`, `ResourceCodeHost`, `ResourceCodeLanguage`, `ResourceMarkdownProps`, `MarkdownRehypePlugins`
-types), and the pieces panes compose around a renderer: `ReviewThreadCard`,
-`ReviewDraftContext`/`ReviewDraftPersistence`, and `createAskAgentRequest`. Renderer implementations are never
-exported; they stay behind each registration's dynamic `loadView`/`loadDiff`. The barrel's eager weight is
-registration metadata plus those pane-side pieces (`ReviewThreadCard` with its composer, the draft context,
-`createAskAgentRequest` with `diff`), which the app's review panes load eagerly anyway.
+One barrel, `@thinkrail/resource-renderers` (`src/index.ts`):
+
+- the registry contract — types, `registerResourceRenderer`, `resolveRenderers`, `describeResource`,
+  `anchorLabel`, `isPlaceable`, `threadLabel`, `outdatedReason`, `rendererImplementationKey`, and the content
+  rules every surface shares: `resourceContent(text, meta, url)` (no metadata yet is provisional text, a
+  missing hash is an absent side, a binary side without a byte URL is absent), `diffResourceMeta(original,
+  modified)` (a diff is described by its modified side unless that side is absent, and is text only when
+  both present sides are) and `PENDING_TEXT_META` — plus `registerBundledResourceRenderers()` (idempotent);
+- the host seam — `ResourceHostProvider`, `ResourcePreferencesProvider`, `ResourceEnvironmentProvider`,
+  `ResourceScopeProvider`, `useOptionalResourceHost`, `useResourceScope` and the `ResourceHost`,
+  `ResourcePreferences`, `ResourceScope`, `ResourceFileReviewProps`, `ResourceReviewSendProps`,
+  `ResourceMarkdown`, `ResourceCodeHost`, `ResourceCodeLanguage`, `ResourceMarkdownProps`,
+  `MarkdownRehypePlugins` types;
+- `canonicalWorkspacePath` — the package's copy of the app's workspace-relative path identity (`lib`'s
+  `projectRelativePath`: POSIX separators, no `.` or empty segments, inner `..` resolved;
+  `apps/web/src/panels/pathIdentity.test.ts` keeps the two equal); `describeResource` and `ResourcePreview`
+  use it, so a `./`-prefixed tool path reads, refreshes and anchors review comments under the same path the
+  host's fs events, the review store and an opened tab use;
+- **`ResourcePreview`** — a self-loading file view, or with `before` (another file) a before/after diff of two
+  workspace files, with the registry's toggle, the unplaced strip, review commenting and Send review, and
+  caller slots (`leading`, `actions`, controlled `rendererId` / `layout`, and an opaque `viewState` it tags
+  with the renderer implementation that wrote it, so a renderer switch never restores another renderer's
+  state and a caller needs no reset);
+- the pieces every surface composes a renderer from, so a file tab, a diff tab, a Changes section and
+  `ResourcePreview` run one sequence:
+  - `useRendererSelection(resource, intent, rendererId)` — candidates for the environment's phone class, the
+    selected renderer, its implementation key (renderer id + phone class) and the placed-thread state;
+  - the lazy `RendererView` mount and **`GuardedRendererDiff`**, the one diff mount: the expensive-diff notice
+    (`diff-too-large` / **Show diff anyway**, per mount, with a caller action slot) until opted in, then the
+    lazy diff renderer, virtualized above `VIRTUALIZED_DIFF_LINES` of the caller's `lineCount`
+    (`surfaceLineCount`);
+  - **`RendererToggles`** — the renderer candidate segments, plus Split/Inline when the caller passes a diff
+    `layout`, the renderer supports layout and the viewport is not phone-class (one rule, so a phone never
+    shows a layout the diff refuses and a single-file view never shows diff layout);
+  - `UnplacedReviewStrip`, `ReviewThreadCard`, `ReviewDraftContext`/`ReviewDraftPersistence`, and
+    `createAskAgentRequest`.
+
+Renderer implementations are never exported; they stay behind each registration's dynamic
+`loadView`/`loadDiff`, and the large-diff estimate, the notice and the lazy diff mount stay behind
+`GuardedRendererDiff`. The barrel's eager weight is registration metadata plus those pane-side pieces, which
+the app's review panes and the chat's visualize card load eagerly anyway (the visualize card added about
+20 KiB to the web entry graph, measured with a production build).
 
 ## Host seam
 
@@ -43,13 +76,34 @@ A host wraps renderers in `ResourceHostProvider` with one static `ResourceHost` 
   from its host's `code` once (`ensureMonaco`), and every later editor reuses that setup; it re-themes on every
   completed theme swap.
 - `bytesUrl(workspaceId, path, oid?)` — the host byte route for images, PDFs and relative markdown assets.
-- `openFile(workspaceId, path)` — where a relative document link navigates.
-
+- `openFile(workspaceId, path, { keep? })` and `openComparison(workspaceId, before, path)` — navigation for
+  relative document links (preview) and explicit Open-in-tab actions (keep).
+- `readFile(workspaceId, path)` and `subscribeFileChanges(workspaceId, onChange)` — `ResourcePreview`'s
+  content and live refresh (`null` paths mean "anything may have changed": a truncated batch or a new
+  connection, whose missed pushes are never replayed). A read may come back without `meta` from a host that
+  predates resource metadata; the preview shows it as provisional text, exactly as the file and diff panes do.
+- `FileReview` (a render-prop component: `{ workspaceId, path, kind, sessionId?, children(review) }`) and
+  `ReviewSend` — the host's review surface and Send review control; the optional session routes sends. The
+  seam is a component, not a hook on the host object: passing hooks around as values breaks React's rules and
+  made the React Compiler bail out of the preview; a before/after nests two `FileReview`s.
 Build the value once (the app does at module scope). Its functions are memo inputs: `documentComponents`
 defines its link and image components per call, so a new `bytesUrl`/`openFile` identity would remount every
 link and image in open previews and notebook cells. The reader's line-width preference
 (`fileLineWidth` / `fileLineWidthBounded`) arrives separately through `ResourcePreferencesProvider`; only
-`MonacoEditor` reads it, so a width change re-renders nothing else. The rendered markdown diff renders both
+`MonacoEditor` reads it, so a width change re-renders nothing else. The phone class arrives the same way
+through `ResourceEnvironmentProvider` (the registry's `ResourceEnvironment`, `{ mobile }`); only
+`ResourcePreview` reads it — panes resolve with their own viewport reading — so a viewport flip re-renders
+only the previews that must re-resolve their renderer. A subtree that belongs to one workspace and chat
+sets `ResourceScopeProvider` (`{ workspaceId, sessionId? }`, read with `useResourceScope`; the web chat wraps
+its transcript list): `ResourcePreview` falls back to its workspace when no `workspaceId` prop is given and
+routes review sends to its session. The scope is its own context rather than a host field because a host
+spread per chat made every preview's reads and subscriptions restart whenever the chat's actions changed.
+`ResourcePreview` depends only on the host's stable `readFile` / `subscribeFileChanges` / `bytesUrl`; it
+applies reads in the order it issued them (a newer change event never discards the read in flight, so a
+burst of events cannot starve the first load), keeps the loaded file when a re-read returns the same hash,
+and keeps the last good content when a re-read fails, like a file tab, but marked stale: the failure is named
+above it (`resource-preview-stale`: `Couldn't refresh <path>: <reason>`), so a moved or deleted file never
+silently passes for current. The rendered markdown diff renders both
 sides with `renderToStaticMarkup`, outside the React tree, so it reads the markdown component and links in its
 own render and passes them to `MarkdownDocument` explicitly — a context read inside a static render would throw
 (found by the Changes/rendered-diff e2e during extraction).
@@ -85,8 +139,8 @@ keeps it.
 - **Small helpers moved with their only consumer or became primitives.** `stripFrontmatter`, `threadLabel`
   and `outdatedReason` live here; `ToggleSegment` and the one loading placeholder (`SkeletonRows` /
   `LoadingRegion`) became `@thinkrail/ui/toggle-segment` and `@thinkrail/ui/skeleton` because the app uses
-  them too. `describeResource` keeps a one-line local `normalizePath`, because the package cannot import the
-  app's `lib`.
+  them too. `describeResource` and `ResourcePreview` canonicalize paths through the package's own
+  `canonicalWorkspacePath`, because the package cannot import the app's `lib`.
 
 ## Boundary
 
@@ -118,7 +172,10 @@ a setter, and a sink for the renderer's hunk content keys; a renderer without it
 is never represented by a byte payload without a URL. `SurfaceReview` carries authoritative anchors; a
 renderer only projects selectors into geometry. `isPlaceable` answers whether at least one positioned
 selector has a geometry the renderer advertises for the requested view or diff intent, while `anchorLabel`
-is the shared compact reference. A diff renderer may report the thread ids it actually placed through
+is the shared compact reference. `ResourceDiffProps.originalResource` describes the original side when it is
+a different file (a file comparison); renderers that resolve relative assets or links from the document
+path — the rendered markdown diff — use it for the original side, and the visual diffs title that side with
+it; absent, both sides share `resource`. A diff renderer may report the thread ids it actually placed through
 `ResourceViewProps.onPlacedThreadIds` or `ResourceDiffProps.onPlacedThreadIds`; the pane treats
 capability-matching ids omitted from that set as unplaced too, covering renderer-local geometry such as a
 removed JSON pointer, deleted table cell, or collapsed context. A virtualized paged renderer reports against
@@ -142,6 +199,18 @@ stable ids, with an optional renderer-supplied id-to-ordinal map producing the l
 Paged regions are `p<page> region`; unpaged regions, lines, and files keep their existing forms. Registration
 carries only dispatch, geometry, viewport, and concrete diff-control capabilities; it has no unenforced
 provenance or execution-policy metadata. Sandboxing belongs to each renderer implementation.
+
+**Wide rewrites wait behind a notice.** Source diffs run on the main thread, and that cost tracks the number
+of changed lines, not the file size: a 10 MB all-added file diffs in ~0.1 s while ~10k changed lines take over
+20 s. Before mounting a diff renderer, `GuardedRendererDiff` estimates the changed lines (`largeDiff`: the
+linear multiset difference of the two sides' lines). Above `LARGE_DIFF_CHANGED_LINES` (2000, about a second of
+diffing), or when an order-sensitive check cannot finish within 50 ms / 2000 edits, it shows `diff-too-large`
+with **Show diff anyway** (per mount) and the caller's actions. A one-sided diff (added or deleted file) is
+never guarded: it costs no diffing. The bounded check closes the multiset estimate's blind spot for reordered
+lines. The notice says "This diff is too expensive to show automatically" without a line count; the guard
+answers only whether automatic rendering should wait. Every diff surface mounts through it, so the app's diff
+tabs and Changes sections, comparison tabs and chat cards cannot disagree.
+
 
 ## Bundled renderers
 
@@ -211,7 +280,8 @@ and onion opacity are measured geometry and therefore the bounded exception to t
 those values alone are inline,
 while every colour, border, spacing, and control skin remains a token utility.
 
-`thinkrail/svg` is the higher-ranked SVG candidate while Source remains available through
+`thinkrail/svg` contains the vector in its pane in both dimensions (≤ 960 px wide), measured in a layout
+effect so a drag's first geometry is already final. It is the higher-ranked SVG candidate while Source remains available through
 `thinkrail/code`. Its `sandbox=""` iframe receives a minimal `srcdoc` document whose only image is a
 percent-encoded `data:image/svg+xml` URL; SVG source never enters the document's HTML stream. The frame
 has no script or same-origin capability and a CSP of `default-src 'none'; img-src data:; style-src
@@ -302,7 +372,16 @@ output uses this same sanitizer. The injected CSP is exactly `default-src 'none'
 style-src 'unsafe-inline'; font-src data:; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src
 'none'; child-src 'none'`. The diff is the shared visual frame constrained to 2-up sandboxed documents only.
 It advertises no anchor geometry, so HTML threads remain in the pane-owned unplaced strip and Source is the
-only authoring candidate.
+only authoring candidate. View and diff share a **preview width** switch in the notice bar — Desktop 1280 /
+Tablet 768 / Phone 390 / Fill, default Desktop, persisted as `{ viewport }` view state and adopted whenever the
+caller's view state changes (`useHtmlViewport`, so a chat card follows a width chosen in its full screen): the frame renders at
+the design width and is CSS-scaled down to its box (never up), keeping its own vertical scroll, so a narrow
+pane, a 2-up half or a chat card shows the true layout shrunk rather than an accidental mobile reflow; Fill
+is the old reflow. Scaling is pure geometry on the wrapper — the iframe keeps `sandbox=""` and nothing
+measures the document (no `allow-same-origin`); the wrapper's box is measured in a layout effect (the package's
+one `useElementSize`, shared with the SVG view and the region surfaces), so the first paint is already fitted
+instead of reflowing the document at the pane width for a frame. The sanitizer also strips form controls, so mockups draw
+buttons and inputs with styled elements; spot (region) comments on HTML are not offered yet.
 
 Pierre parses the two complete text sides (`absent` → `null`) with the current ignore-whitespace value,
 uses the `thinkrail` CSS-variable Shiki theme, word-level inline changes, collapsed unchanged regions with
@@ -351,7 +430,7 @@ tall as its content, so its virtualizer "sees" every line and renders them all (
 text side's line count, including unchanged context) gets the same bounded `60vh` viewport as
 `"always"` renderers and owns its scroller. Counting source lines keeps expansions virtualized even
 when a large file has only a small edit, and covers untracked files without git's missing counts.
-The same threshold gates virtualization in every host: `DiffSurfaceBody` passes `virtualize` only
+The same threshold gates virtualization in every host: `GuardedRendererDiff` passes `virtualize` only
 above it, and below it `PierreDiff` withholds its virtualizer so the plain `FileDiff` renders every
 row, as before virtualization. Virtualizing small diffs bought nothing and cost two failures. A
 virtualized instance's hydrate measures its offset (forcing layout) while its container is still
@@ -452,7 +531,10 @@ content's own height.
   context menu/copy, links, hover, word highlighting, sticky scroll, go-to-line/command palette, read-only
   messaging and Unicode highlighting); keeping word highlighting preserves F7. The TS/JS/JSON/CSS/HTML
   language-service contributions and their workers are absent, so this viewer emits no language-service
-  diagnostics by construction.
+  diagnostics by construction. Each editor mount owns its model: the model id is a per-mount `useId` scope
+  ahead of the path, because `@monaco-editor/react` shares one model per `path` and disposes it with
+  whichever editor unmounts first, which blanked the surviving view once the same file could be on screen
+  twice (a chat card and its full screen, a card and the file's tab).
 - **Code surfaces re-theme from generic tokens, resiliently.** `MonacoEditor` has the sole `EDITOR_THEME`.
   Themes own one TextMate scope definition: chat uses its live CSS-variable form, while Monaco resolves that
   same definition plus its complete editor/widget/menu/input colour map to hex, loads it into a dedicated

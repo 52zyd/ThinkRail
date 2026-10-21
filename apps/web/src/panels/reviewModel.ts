@@ -88,6 +88,33 @@ export function reviewFlagFor(
 	return reviewFlags(comments).get(path) ?? null;
 }
 
+export function tabReviewPaths(tab: { path: string; before?: string | undefined }): string[] {
+	return tab.before === undefined || tab.before === tab.path ? [tab.path] : [tab.path, tab.before];
+}
+
+export function reviewFlagForPaths(
+	flags: ReadonlyMap<string, ReviewFlag>,
+	paths: readonly string[],
+): ReviewFlag | null {
+	let flag: ReviewFlag | null = null;
+	for (const path of paths) {
+		const next = flags.get(path);
+		if (next === "draft") return "draft";
+		flag ??= next ?? null;
+	}
+	return flag;
+}
+
+export function sameThreads(
+	left: readonly ReviewThread[],
+	right: readonly ReviewThread[],
+): boolean {
+	return (
+		left.length === right.length &&
+		left.every((thread, index) => JSON.stringify(thread) === JSON.stringify(right[index]))
+	);
+}
+
 export function fileThreads(
 	comments: ReviewComment[] | undefined,
 	path: string,
