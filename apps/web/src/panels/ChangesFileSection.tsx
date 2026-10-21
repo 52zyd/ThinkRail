@@ -8,20 +8,23 @@ import {
 	RiArrowGoBackLine as Revert,
 } from "@remixicon/react";
 import type { GitDiffScope, GitFileChange } from "@thinkrail/contracts";
+import type { HunkTriage, ReviewDraftPersistence } from "@thinkrail/resource-renderers";
+import { ReviewDraftContext } from "@thinkrail/resource-renderers";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@thinkrail/ui/dropdown-menu";
+import { LoadingRegion } from "@thinkrail/ui/skeleton";
+import { ToggleSegment } from "@thinkrail/ui/toggle-segment";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { copyText, isPhoneViewport } from "@/lib";
-import type { HunkTriage } from "@/resources";
 import { statusLetter } from "../chat/planView";
-import { LoadingRegion } from "../components/Skeleton";
 import {
 	type ChangesTabSection,
 	type DiffTabView,
+	selectChangesTabSection,
 	selectDiffTabTargetRef,
 	selectWorkspaceTick,
 	useAppStore,
@@ -38,9 +41,7 @@ import { DiffSurfaceBody, useDiffSurface } from "./DiffSurface";
 import { HeaderIconButton } from "./HeaderIconButton";
 import { openDiffInTab } from "./openTabs";
 import { rendererImplementationKey, rendererTestId } from "./resourcePane";
-import { ReviewDraftContext } from "./resources/reviewDraftState";
 import type { SectionContent, SectionContentCache } from "./sectionContentCache";
-import { ToggleSegment } from "./ToggleSegment";
 import { useLiveTabContent } from "./useLiveTabContent";
 
 const PENDING_CONTENT = {
@@ -177,9 +178,17 @@ export const ChangesFileSection = memo(function ChangesFileSection({
 		triage,
 	});
 	const { renderer, candidates, implementationKey, mobile, hunkActions } = surface;
-	const reviewDrafts = useMemo(
-		() => ({ rendererId: renderer.id, values: section?.reviewDrafts, update: updateReviewDraft }),
-		[renderer.id, section?.reviewDrafts, updateReviewDraft],
+	const reviewDrafts = useMemo<ReviewDraftPersistence>(
+		() => ({
+			rendererId: renderer.id,
+			read: (key) =>
+				selectChangesTabSection(useAppStore.getState(), workspaceId, tabId, path)?.reviewDrafts?.[
+					key
+				],
+			subscribe: useAppStore.subscribe,
+			update: updateReviewDraft,
+		}),
+		[path, renderer.id, tabId, updateReviewDraft, workspaceId],
 	);
 	const view = mobile ? "inline" : (tabView ?? "split");
 	const { dir, base } = splitPath(path);
