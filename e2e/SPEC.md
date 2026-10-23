@@ -126,6 +126,9 @@ position: resetting `scrollTop` without a scroll event can make the hook's obser
 return's first frame happened to cover exactly the probe's step, so no detach is seen.
 Disclosure-anchor probes place the complete header below the real sticky breadcrumb before asserting
 fixed-position behavior. Intersection with the scroller alone does not prove that a header is unobscured.
+Programmatic disclosure-anchor probes activate inside the sampling evaluate, so the first post-change frame
+is always measured, and a disconnected anchor fails as a remount instead of reporting a detached node's zero
+rect.
 Pierre surfaces paint plain text first and replace their rows when the worker's highlight lands, which
 is late on slower hosts such as the compiled-binary and packaged-desktop artifacts; pointer probes wait
 for highlighted tokens (`pierreHighlightedTokens`) before measuring or dragging rows.
