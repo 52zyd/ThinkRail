@@ -192,4 +192,5 @@ identities. A tab's shell outlives every client that looks at it; each frontend 
   a shell's first frame may be mode-only (bash's `ESC[?2004h`), which the recorder never stores, so a revive
   test persists only after its printed marker arrives and asserts the replay contains it.
 - `e2e/terminals.spec.ts` — the rapid re-entry regression, reload survival, second-client takeover,
-  cross-client tab convergence.
+  cross-client tab convergence, addressed-output isolation. Its output markers likewise never appear
+  contiguously in the typed command: keystroke echo reaches the screen first, split across output batches.
