@@ -624,14 +624,21 @@ export default function ChatView({
 			.catch(() => {});
 	};
 
-	const onHistoryOpen = () => openOverlay(draft);
-
-	const onManageTemplates = () => useAppStore.getState().openSettings(SettingsSection.Templates);
-
 	const onDismissHistory = () => {
 		closeHistory();
 		composerRef.current?.refocus();
 	};
+
+	const onHistoryOutsidePress = () => {
+		closeHistory();
+		setTimeout(() => {
+			if (document.activeElement === document.body) composerRef.current?.refocus();
+		});
+	};
+
+	const onHistoryOpen = () => (historyState.open ? onDismissHistory() : openOverlay(draft));
+
+	const onManageTemplates = () => useAppStore.getState().openSettings(SettingsSection.Templates);
 
 	const onInsertHit = (hit: PromptHit) => {
 		composerRef.current?.insertText(hit.text);
@@ -820,6 +827,7 @@ export default function ChatView({
 					onToggleStage={toggleStage}
 					onMoveSelection={moveSelection}
 					onClose={onDismissHistory}
+					onOutsidePress={onHistoryOutsidePress}
 					onInsert={onInsertHit}
 					onInsertAndSend={onInsertAndSendHit}
 					onOpenMessage={openMessage}
