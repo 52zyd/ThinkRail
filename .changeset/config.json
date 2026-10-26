@@ -1,6 +1,6 @@
 {
 	"$schema": "https://unpkg.com/@changesets/config@3.1.1/schema.json",
-	"changelog": ["@changesets/changelog-github", { "repo": "JetBrains/thinkrail" }],
+	"changelog": ["@changesets/changelog-github", { "repo": "52zyd/ThinkRail" }],
 	"commit": false,
 	"fixed": [],
 	"linked": [],
