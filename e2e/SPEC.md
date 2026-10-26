@@ -345,7 +345,8 @@ convergence with draft invalidation, sanitized read/write failures with Retry, m
 and pre-v76 hiding.
 
 General and private-restart fixtures explicitly seed English through `fixtures/settingsConfig.ts`.
-Telemetry-removal coverage asserts no Privacy navigation, consent prompt or client error frames.
+Telemetry-removal coverage asserts no Privacy navigation, consent prompt or client error frames,
+then restores English in teardown even when its Chinese UI assertions fail.
 
 Each scenario's app reset also removes the lane fixture repository's `origin` remote: the topbar's Remote /
 Pull request segments read the shared repo config, so an origin a push scenario added must never reshape a

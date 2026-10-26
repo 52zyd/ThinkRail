@@ -3,7 +3,11 @@ import { shot } from "./fixtures/screenshots";
 import { seedEnglishConfig } from "./fixtures/settingsConfig";
 import { E2eWire } from "./fixtures/wire";
 
-test("privacy and consent controls are absent after restart with legacy preferences", async ({
+test.afterEach(async ({ baseURL }) => {
+	await seedEnglishConfig(baseURL);
+});
+
+test("privacy and consent controls are absent after reload with legacy preferences", async ({
 	page,
 	baseURL,
 }) => {
