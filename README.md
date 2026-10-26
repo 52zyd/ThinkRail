@@ -1,243 +1,149 @@
 # ThinkRail
 
-[![JetBrains incubator project](https://jb.gg/badges/incubator-plastic.svg)](https://confluence.jetbrains.com/display/ALL/JetBrains+on+GitHub)
-[![GitHub stars](https://img.shields.io/github/stars/JetBrains/thinkrail?style=social)](https://star-history.com/#JetBrains/thinkrail&Date)
+基于 [`JetBrains/thinkrail`](https://github.com/JetBrains/thinkrail) 的中文增强版本，围绕
+[`pi`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent) 编程代理构建。
+在同一个工作台中管理项目、聊天、终端、文件与代码差异，用规格文档和可复用技能保留项目知识。
 
-ThinkRail is the agentic IDE that gets better every time you use it — learning your project through
-living specs today, and building its own capabilities tomorrow.
+本仓库提供简体中文默认界面、多服务 OpenAI 兼容接入，以及可直接安装的 Windows x64 桌面包。
+这是基于上游源码的定制版本，不是 JetBrains 官方签名发行版；内置提供商与 pi 引擎保持原有体系。
 
-We built a rich interface around the [`pi`](https://www.npmjs.com/package/@earendil-works/pi-coding-agent)
-coding agent, isolated work into separate workspaces, and gave the agent durable project knowledge
-through living specs and reusable skills. Next, we're adding full extension support, so ThinkRail can
-create the tools it needs based on how you actually work.
+## 功能
 
-**Website:** [thinkrail.ai](https://thinkrail.ai/) · **Blog:** [thinkrail.ai/blog](https://thinkrail.ai/blog/)
+- **中文界面**：新配置默认使用简体中文，保留英文和“跟随系统”；不覆盖已有明确语言偏好。
+- **自定义模型服务**：配置多个 API 基地址、Key 和模型列表，分别选择 Chat Completions 或 Responses。
+- **独立工作区**：使用 Git worktree 隔离分支与工作目录，也可在项目文件夹或已有 worktree 中工作。
+- **流式聊天与子代理**：同一工作区内运行多个 pi 会话，选择模型、查看引擎报告的 token 与费用、发送后续任务。
+- **代码工作台**：文件树、Monaco 编辑器、终端、差异查看与锚定审查评论，支持打开已安装的 IDE。
+- **项目知识**：通过 `SPEC.md` 规格图、技能和工作流管理持久上下文，而不是另建一套模型运行系统。
+- **MCP 与扩展**：复用 pi 的 MCP 配置和扩展能力，在设置中管理服务、认证与项目授权。
+- **桌面与浏览器**：原生桌面应用和 CLI 共用同一宿主与界面；应用状态通常位于 `~/.thinkrail`。
 
-⭐ If you find ThinkRail useful, give it a star — it helps others discover it.
+## Windows 安装
 
-<p align="center">
- <a href="https://www.star-history.com/jetbrains/thinkrail">
-  <picture><source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=JetBrains/thinkrail&type=rank&theme=dark" /><source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=JetBrains/thinkrail&type=rank" /><img alt="Star History Rank" src="https://api.star-history.com/badge?repo=JetBrains/thinkrail&type=rank" /></picture> <picture><source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=JetBrains/thinkrail&type=trending&theme=dark" /><source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=JetBrains/thinkrail&type=trending" /><img alt="GitHub Trending Repository of the Day" src="https://api.star-history.com/badge?repo=JetBrains/thinkrail&type=trending" /></picture>
- </a>
-</p>
+无需自行安装 Bun、Node.js 或项目依赖即可使用随附的桌面包；项目操作仍需要可用的 Git，
+模型账号与凭据由用户自行配置。界面使用系统 WebView2，缺少运行时时需要补装。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/readme-assets/workbench-dark.png">
-  <img src=".github/readme-assets/workbench-light.png" alt="ThinkRail workbench: the Projects pane beside the left tool rail listing worktree workspaces and their Settled shelf, a finished pi conversation with its tool steps in the center, the resulting diff beside it, and the Specs tree above the Changes list on the right with their tools on the edge rail" width="900">
-</picture>
+1. 下载 [`bytools/thinkrail-desktop-windows-x64.zip`](bytools/thinkrail-desktop-windows-x64.zip)，在 GitHub 文件页选择下载原始文件。
+2. **完整解压**压缩包，不要在压缩包预览中直接运行程序。
+3. 在解压目录中双击 `ThinkRail-Setup.exe`，按提示安装。必须保留旁边的 `.installer` 文件夹。
+4. 已安装 ThinkRail 的用户，先退出应用并备份个人配置与聊天记录。本包沿用原项目的应用标识，不保证与官方版本并存。
 
-*A `pi` session and the change it made, scoped to an isolated git-worktree workspace.*
+本机仓库中的 `bytools/ThinkRail-Setup.exe` 也可直接启动安装，前提是配套载荷保持在原位置。
+分发时发送完整 ZIP，不要单独发送 EXE。
 
-## What you get
-
-- **Isolated workspaces.** Open any git repo as a project and cut workspaces from it as `git worktree`s,
-  each with its own branch and working directory. Agents work in parallel without touching your
-  checkout; merge the good branch, delete the rest. You can also attach existing worktrees or explicitly
-  work in the project folder itself. Finished and dormant workspaces settle onto a per-project shelf on
-  their own — when their pull request merges or closes, or after a quiet week — and come back the moment
-  you work in them. The topbar shows where the active branch stands against `origin` and its pull request,
-  with the next step one click away: publish, push, or open a PR described from the plan, the commits,
-  your PR template, or an agent-written draft. Once a GitHub PR is open it shows the CI checks and review
-  decision, and lets you mark it ready, hand failing checks or a diverged branch to the agent, merge it
-  with the repository's last-used method, reopen it, or delete the remote branch.
-- **A real IDE around the agent.** A splittable workbench of Monaco editor tabs, a Files tree with live git
-  change marks and a Changed view, terminals, and documents — all scoped to the active workspace. Leave
-  anchored review comments on files and diffs and send them to a chat as structured context, or open the
-  worktree in your installed IDE.
-- **Chats that stream like the engine thinks.** Several concurrent `pi` sessions per workspace, each with
-  its own model and live token and cost readout. Steer a running turn or queue a follow-up, delegate to
-  subagents, and work a shared plan the agent updates and you edit — each completed step can be committed
-  and reviewed on its own.
-- **Specs as ground truth.** A connected graph of `SPEC.md` files lives beside the code; the agent reads,
-  searches, and maintains it through dedicated `spec_*` tools, so intent survives the session. The
-  read-only Specs tool renders the graph as a tree in the workbench.
-- **Skills and workflows.** Portable Agent Skills you already keep for other coding agents are read in
-  place, and bundled workflows guide project setup, design brainstorming, and shipping a pull request —
-  pushing the workspace branch and opening or updating its GitHub PR through your own `gh`.
-- **Agent tools beyond the shell.** Web research, and inline diagrams, option comparisons and file previews
-  rendered right in the chat — when the agent proposes a UI change it shows a before/after mockup you can
-  comment on like a diff. Settings → Extensions lists the ThinkRail extensions the agent gets and lets you switch
-  each one off.
-- **MCP servers.** Connect the MCP servers in your `pi` `mcp.json` (or add them, and a few presets, from
-  Settings): ThinkRail asks in the chat before calls the server does not mark read-only (or always allows
-  the tools you trust in a project), keeps servers a repository
-  defines off until you approve them, signs you in to OAuth servers from Settings, and shows each chat's
-  servers next to its background commands and subagents.
-- **Your providers, your credentials.** Sign in with [JetBrains AI](https://www.jetbrains.com/ai/) or
-  connect any provider through `pi`'s own auth. ThinkRail has no accounts of its own.
-- **Desktop app or browser.** A native desktop app, or the `thinkrail` CLI that opens the same app in your
-  browser. Both embed the same engine host; app state lives under `~/.thinkrail`.
-- **Your language.** Settings → Language follows your system language or a language you pick; English and
-  Simplified Chinese are built in. Add a language ThinkRail doesn't ship yet by dropping a translated
-  `en.json` into `~/.thinkrail/locales` — it applies as you save. Agent replies and tool output stay as
-  the agent wrote them.
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset=".github/readme-assets/specs-dark.png">
-  <img src=".github/readme-assets/specs-light.png" alt="The Specs tool, opened from the right edge rail, listing the project's spec tree while the product goal spec is rendered in the editor" width="900">
-</picture>
-
-*The project's spec graph as a tree, with the spec itself rendered alongside.*
-
-## Install
-
-ThinkRail ships in two additive forms: a native desktop installer and the self-contained `thinkrail` CLI.
-Both are published with `SHA256SUMS` on the [releases page](https://github.com/JetBrains/thinkrail/releases).
-
-### Desktop
-
-Download the `thinkrail-desktop-*` asset for your platform:
-
-- **macOS (Apple Silicon)** — open the DMG. There is no Intel desktop build.
-- **Windows x64** — extract the complete setup ZIP, then run its setup executable in place, next to its
-  payload.
-- **Linux x64 / ARM64** — extract the setup tarball and run `installer`. Desktop builds need glibc 2.38+
-  with GTK 3, WebKitGTK 4.1, Ayatana AppIndicator 3, and librsvg 2 — Ubuntu 24.04 or newer:
-
-  ```bash
-  sudo apt install libgtk-3-0 libwebkit2gtk-4.1-0 libayatana-appindicator3-1 librsvg2-2
-  ```
-
-Packaged stable and nightly desktop builds check for updates in the background and offer them in
-**Settings → Updates**: **Download** → **Preparing update** → **Install & Restart**. Nothing is applied until
-you choose **Install & Restart**. ThinkRail then shows the installation's progress and log, closes, and
-reopens on the new version. After the restart it tells you whether the update installed. If it didn't, it
-explains why and offers to retry. The updater appears only when the package carries a valid HTTPS feed
-identity; installations that predate that identity need one manual installation first.
-
-### Command line
-
-The installer downloads the right binary, verifies its SHA-256 checksum, and puts `thinkrail` on your PATH.
-
-**macOS / Linux** (also Windows under Git Bash):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/JetBrains/thinkrail/main/install.sh | bash
-```
-
-**Windows** — the same command works from cmd and PowerShell:
+安装包约 **53.34 MiB**，内部版本仍为 `0.0.0-dev`，**未签名**。Windows 可能显示发布者未知或
+SmartScreen 警告，请核实来源后自行决定是否运行，不需要关闭系统安全防护。
+[`bytools/SHA256SUMS`](bytools/SHA256SUMS) 用于检查完整性，不代替代码签名或来源认证：
 
 ```powershell
-powershell -c "irm https://raw.githubusercontent.com/JetBrains/thinkrail/main/install.ps1 | iex"
+Get-FileHash .\thinkrail-desktop-windows-x64.zip -Algorithm SHA256
 ```
 
-Then run `thinkrail`, optionally with a git repo to open as a project:
+将输出与 `SHA256SUMS` 中对应文件的值比较。完整说明和安装包验证边界见
+[`bytools/README.txt`](bytools/README.txt)。尚未在全新 Windows 系统上验证安装与卸载；
+原生窗口完整冒烟检查在最大化步骤超时，不能将宿主启动成功视为所有窗口交互通过。
+
+**更新提示**：当前桌面包保留上游官方更新地址。若要保留本仓库的定制功能，不要安装官方更新；
+更新此仓库源码后重新打包。上游的安装脚本与发行包也不包含这里的定制改动。
+macOS 和 Linux 用户可自行构建，或选择[上游发行版](https://github.com/JetBrains/thinkrail/releases)，但两者不是同一分发版本。
+
+## 接入 OpenAI 兼容服务
+
+打开 **设置 → 提供商 → OpenAI 兼容服务**，选择添加服务。
+
+| 配置项 | 填写说明 |
+| --- | --- |
+| 服务名称 | 用于区分不同服务，不覆盖内置提供商 |
+| API 基地址 | 例如 `https://api.example.com/v1`；填写基地址，不要填写完整的 `/chat/completions` 或 `/responses` 地址 |
+| 接口协议 | 默认 Chat Completions；需要 Responses 时显式选择，不会在失败后自动切换 |
+| API Key | 按服务要求填写；编辑时留空保留已有 Key，明确开启“此服务无需 Key”才清除凭据 |
+| 模型 ID | 至少一个，使用服务实际支持的完整 ID；可手动添加多个模型 |
+| 模型高级设置 | 可填写上下文、最大输出上限，以及推理和图像能力；留空使用 pi 默认值，不按模型名称猜测 |
+
+点击“获取模型”时，宿主访问基地址下的 `/models`，使用表单中的 Key 或该服务已保存的 Key。
+返回的模型可选择加入列表。获取失败会保留表单和已有模型，也始终允许手动输入；
+失败不等于该服务的聊天接口不可用。
+
+保存后自定义模型进入现有模型选择器，**不会自动切换当前聊天或默认模型**。
+修改服务前先关闭使用它的关联聊天与子代理，删除时也一样；聊天记录保留。
+更换端点或协议会生成新的服务身份，需要重新选择对应模型。
+
+注意以下边界：
+
+- 基地址允许 HTTP/HTTPS，包括本机与局域网；用户提供的路径会保留，不自动追加 `/v1`，拒绝 URL 中的账号密码。
+- “无需 Key”只适用于不要求鉴权的服务，内部使用非秘密占位值，不代表可以绕过远端鉴权。
+- 真实 Key 通过 pi 的本地凭据接口保存，不返回给读取接口，也不保存到浏览器；没有新增加密保险库。
+- HTTP 会明文传输凭据。除可信本机或受控网络服务外，优先使用 HTTPS。
+- 未填写的模型上限与默认价格不是服务的真实承诺；不要据此判断请求免费或模型能力。
+- 实际端点、协议和模型是否兼容仍需用你的服务实测，文档不承诺第三方服务质量、价格或可用性。
+
+<img src=".github/readme-assets/providers-zh.png" alt="中文 OpenAI 兼容服务配置：自定义 API 基地址、Responses 协议、Key 状态与模型列表" width="640">
+
+## 语言设置
+
+在 **设置 → 语言** 中选择简体中文、英文或跟随系统，设置会在重启后保留。
+已有配置明确选择英文时不会被强制改成中文；新配置及缺少语言字段的配置默认中文。
+
+界面翻译不改变模型回复语言，不翻译用户内容、终端输出、代码、模型 ID 或第三方错误原文。
+自定义语言文件可放在 `~/.thinkrail/locales`；语言包与占位符规则见
+[`packages/locales/SPEC.md`](packages/locales/SPEC.md)。
+
+## 从源码运行与打包
+
+开发环境需要 **Bun 1.4.4**、**Node.js ≥ 22.19** 和 Git。运行真实代理任务还需要可用的模型服务。
+依赖版本按仓库锁定，不需要顺带升级 pi 或其他依赖。
 
 ```bash
-thinkrail ~/code/my-repo
+git clone https://github.com/dafeiyupp/ThinkRail.git
+cd ThinkRail
+bun install --frozen-lockfile
+bun run dev
 ```
 
-`thinkrail` needs `git` on your PATH and a model provider — sign in with JetBrains AI from the app or use
-your own provider credentials. `thinkrail --help` lists the flags; `thinkrail --version` prints the build.
-
-<details>
-<summary><strong>Nightly builds, pinned versions, updates, and uninstall</strong></summary>
-
-The installer takes `--channel stable|nightly` and `--version`; a pinned version must belong to the
-selected channel:
+`bun run dev` 同时启动宿主与 Web 界面，按 `Ctrl+C` 停止。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/JetBrains/thinkrail/main/install.sh | bash -s -- --channel nightly
-curl -fsSL https://raw.githubusercontent.com/JetBrains/thinkrail/main/install.sh | bash -s -- --channel stable --version 0.1.2
-curl -fsSL https://raw.githubusercontent.com/JetBrains/thinkrail/main/install.sh | bash -s -- --channel nightly --version 0.2.0-nightly.10
+bun run --filter @thinkrail/cli dev  # 在浏览器中打开应用
+bun run build:binary               # 构建独立 CLI
+bun run desktop:dev                # 打包并打开原生桌面应用
+bun run desktop:build              # 仅构建开发版桌面应用
+bun run desktop:package:stable     # 构建当前平台的安装包
 ```
 
-On Windows the options are environment variables (`THINKRAIL_CHANNEL`, `THINKRAIL_VERSION`,
-`THINKRAIL_PREFIX`, `THINKRAIL_NO_MODIFY_PATH`):
+Windows 打包输出在 `apps/desktop/artifacts/`，不会自动更新 `bytools/`。
+发布新的 Windows 包时，需要一起替换完整的安装载荷、ZIP、说明和校验文件。
+详细开发流程、正式测试、打包及隔离要求见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+项目测试源码保留在仓库中；本机调试脚本、依赖缓存、日志、报告和临时截图不属于发布内容。
 
-```powershell
-$env:THINKRAIL_CHANNEL='nightly'; irm https://raw.githubusercontent.com/JetBrains/thinkrail/main/install.ps1 | iex   # PowerShell
-set "THINKRAIL_CHANNEL=stable" && set "THINKRAIL_VERSION=0.1.2" && powershell -c "irm https://raw.githubusercontent.com/JetBrains/thinkrail/main/install.ps1 | iex"   # cmd
-```
+## 架构与文档
 
-Installed stable and nightly CLI hosts periodically offer **Run Update** in **Settings → Updates**. It runs
-the host machine's `thinkrail update` in the background — also when the UI is open in a browser on another
-machine — and a successful update asks you to restart the host manually. You can run `thinkrail update`
-directly on any platform: it re-runs the installer for the installed channel and replaces
-`<prefix>/bin/thinkrail[.exe]`; pass `--channel` or `--version` only for an explicit override.
+ThinkRail 是薄宿主，pi 在进程内运行并管理模型、技能、压缩、费用与会话状态。
+桌面与 CLI 只负责启动同一个宿主，不引入第二套代理运行时。
 
-`thinkrail uninstall` removes the executable, the PATH entry the installer added, and the install metadata,
-and asks whether to delete your `~/.thinkrail` app state (kept by default — `--remove-data` deletes it,
-`-y` skips the questions).
+| 模块 | 职责 |
+| --- | --- |
+| `packages/server`、`packages/shared` | 引擎宿主、工作区与服务端状态 |
+| `packages/contracts` | 类型化、版本门控的宿主与界面协议 |
+| `apps/web` | React、Zustand、Tailwind 工作台界面 |
+| `apps/desktop`、`apps/cli` | 原生桌面与浏览器启动器 |
+| `packages/locales` | 界面语言包 |
 
-Prefer a manual install? Download a binary and `SHA256SUMS` from the releases page and verify the checksum.
-For self-update to work, rename it to `thinkrail` (`thinkrail.exe` on Windows) and place it at
-`<prefix>/bin/thinkrail[.exe]`; a binary kept under its release filename or elsewhere must be replaced
-manually or reinstalled with the script.
+- [产品目标与需求](goal-and-requirements.md)
+- [架构与模块边界](architecture.md)
+- [pi 兼容性记录](pi-compatibility.md)
+- [贡献与验证指南](CONTRIBUTING.md)
+- [上游项目](https://github.com/JetBrains/thinkrail)
 
-</details>
+## 隐私与凭据
 
-### Platform notes
+原项目包含使用分析与错误分类上报机制。使用分析不包含提示词、代码、文件或凭据；
+错误上报只允许分类信息和 ThinkRail 自身栈帧，不包含错误消息或项目内容。
+“共享额外使用数据”在设置中的隐私页控制额外共享；CLI 的 `--no-analytics` 或
+`THINKRAIL_NO_ANALYTICS=1` 也只关闭额外共享，不应理解为关闭所有上报。
+具体规则见 [`packages/server/src/analytics/SPEC.md`](packages/server/src/analytics/SPEC.md)。
+不要将 API Key、个人配置或包含敏感内容的本机日志提交到 Git。
 
-| Platform | Desktop | CLI |
-| --- | --- | --- |
-| macOS Apple Silicon | DMG | signed binary |
-| macOS Intel | no Electrobun build | not prebuilt — [build from source](#developing-thinkrail) |
-| Windows x64 | signed setup executable and app binaries | signed `.exe` |
-| Linux x64 / ARM64 | setup tarball, unsigned | unsigned |
+## 许可证
 
-JetBrains signs the Windows CLI, the desktop setup executable, and every executable and DLL the desktop app
-installs. The macOS CLI is signed but not yet notarized.
-Signed and notarized desktop DMGs require the coordinated JetBrains service pipeline; older published DMGs
-and locally built packages may still be unsigned and blocked by Gatekeeper. Linux artifacts are unsigned.
-
-## Analytics & privacy
-
-ThinkRail collects basic usage events — launches, chat creation, message sends, provider connections — tied to
-a random installation ID. Usage analytics never include prompts, code, files, credentials, or account
-identity. Error reports are also always sent, tied to the same installation ID, so we can fix crashes: the
-error type and code and where in ThinkRail's own code it happened. They never include error messages, file
-paths, names, URLs, or anything from your projects or extensions. Additional product
-usage and how you found ThinkRail are shared only while **Share additional usage
-data** is on; the switch is offered at first launch and lives in **Settings → Privacy**. When launching from
-the command line, `thinkrail --no-analytics` (or `THINKRAIL_NO_ANALYTICS=1`) turns additional sharing off for
-that run. With additional sharing on, a packaged build may open the ThinkRail blog in your browser once to
-link your installation to the website visit that brought you here — only where you accepted marketing cookies on the
-website or no consent is required — and that link expires after 30 days.
-
-## Under the hood
-
-ThinkRail is a thin host that runs `pi` in-process and bridges it to a rich web UI. `pi` owns models,
-skills, compaction, cost, and session state; the app owns the workspace, the editor, and the wire — it
-never assembles prompts behind your back. Three rings:
-
-- **Engine host** — `packages/server` (+ `packages/shared`): a `Bun.serve` HTTP+WS host with one in-process
-  `pi` session per chat, launched by `apps/cli` or `apps/desktop`.
-- **The wire** — `packages/contracts`: the typed, versioned protocol between host and UI.
-- **UI client** — `apps/web`: React 19 + Zustand + Tailwind v4, shipped independently; it dials a host over
-  the wire and depends on the contracts only.
-
-[`goal-and-requirements.md`](goal-and-requirements.md) and [`architecture.md`](architecture.md) are the
-canonical product and design specs. ThinkRail is developed spec-first: a `SPEC.md` sits beside every
-module, and a change that moves a boundary, contract, or decision updates the spec in the same change.
-
-## Developing ThinkRail
-
-You need **Bun** 1.4.4 (the pinned package manager and runtime), **Node.js** ≥ 22.19 (required by the
-in-process `pi` engine), and an authenticated `pi` provider for agent work.
-
-```bash
-git clone https://github.com/JetBrains/thinkrail.git
-cd thinkrail
-bun install
-bun run dev                          # host + web client together; Ctrl+C stops both
-```
-
-```bash
-bun run --filter @thinkrail/cli dev  # browser launcher
-bun run build:binary                 # standalone CLI artifact
-bun run desktop:dev                  # package and open the Electrobun app
-bun run desktop:build                # package without opening it
-```
-
-[`CONTRIBUTING.md`](CONTRIBUTING.md) covers the checks, the end-to-end suites, desktop packaging, and the
-repository layout.
-
-## Contributing
-
-Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md). This project and community are
-governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
-
-## License
-
-Licensed under the [Apache License 2.0](LICENSE).
+本仓库沿用上游的 [Apache License 2.0](LICENSE)。原项目版权与许可证声明保持不变；
+社区参与规则见 [Code of Conduct](CODE_OF_CONDUCT.md)。

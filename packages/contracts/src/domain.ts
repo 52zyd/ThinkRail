@@ -689,10 +689,39 @@ export interface BranchList {
 
 export type ProviderAuthKind = "oauth" | "api-key" | "env" | "central" | "other";
 
+export interface CompatibleModelInput {
+	id: string;
+	contextWindow?: number;
+	maxTokens?: number;
+	reasoning?: boolean;
+	imageInput?: boolean;
+}
+
+export interface CompatibleProviderInput {
+	id?: string;
+	revision?: string;
+	name: string;
+	baseUrl: string;
+	api: "openai-completions" | "openai-responses";
+	models: CompatibleModelInput[];
+	apiKey?: string | null;
+}
+
+export interface CompatibleProvider {
+	id: string;
+	revision: string;
+	name: string;
+	baseUrl: string;
+	api: CompatibleProviderInput["api"];
+	models: CompatibleModelInput[];
+	hasKey: boolean;
+}
+
 export interface ProviderStatus {
 	id: string;
 	name: string;
 	configured: boolean;
+	compatible?: true;
 	kind?: ProviderAuthKind;
 	detail?: string;
 	canOAuth?: boolean;
@@ -1087,7 +1116,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	jbcentralQuotaRefreshSeconds: JBCENTRAL_QUOTA_REFRESH_SECONDS.default,
 	settleIdleDays: SETTLE_IDLE_DAYS.default,
 	disabledExtensions: [],
-	locale: SYSTEM_LOCALE_PREFERENCE,
+	locale: "zh-CN",
 };
 
 export function normalizeThemePreference(value: unknown): ThemePreference {

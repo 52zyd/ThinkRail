@@ -30,6 +30,7 @@ import {
 	compactSession,
 	createSession,
 	deleteSession,
+	discoverCompatibleModels,
 	ensureSessionAttached,
 	followUpSession,
 	getSessionCommands,
@@ -42,6 +43,7 @@ import {
 	isMcpLoginId,
 	isPiSessionId,
 	listAvailableModels,
+	listCompatibleProviders,
 	listModelContextSettings,
 	listProjectAliasSkillNames,
 	listSessionStates,
@@ -60,12 +62,14 @@ import {
 	refreshSubagentConcurrency,
 	refreshSubagentTools,
 	reloadSessionResources,
+	removeCompatibleProvider,
 	removeQueuedSession,
 	removeSession,
 	removeWorkspaceSessions,
 	renameSession,
 	replyMcpProbe,
 	resolveExtUi,
+	saveCompatibleProvider,
 	sendReviewFixToSession,
 	setModelContextWindow,
 	setSessionModel,
@@ -1171,6 +1175,13 @@ const handlers: WsHandlers = {
 		observeSetupRead(getProviderStatus, (report) => ({
 			provider_available: providerAvailability(report),
 		})),
+	"provider.compatibleList": () => listCompatibleProviders(),
+	"provider.compatibleSave": (p) => saveCompatibleProvider(p),
+	"provider.compatibleDiscover": (p) => discoverCompatibleModels(p),
+	"provider.compatibleRemove": async (p) => {
+		await removeCompatibleProvider(p.id, p.revision);
+		return { ok: true } as const;
+	},
 	"provider.loginStart": (p) => {
 		const type = p.type ?? "oauth";
 		const capture = additionalCapture();

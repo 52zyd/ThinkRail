@@ -22,3 +22,14 @@ test("pushes the active language's desktop menu and dialog labels when the nativ
 test("is a no-op without the bridge", () => {
 	expect(() => pushNativeMenuLabels()).not.toThrow();
 });
+
+test("Chinese menus and startup labels reach the native desktop bridge", () => {
+	const sent: Record<string, string>[] = [];
+	Reflect.set(globalThis, "__THINKRAIL_NATIVE_MENU__", {
+		setLabels: (labels: Record<string, string>) => sent.push(labels),
+	});
+	applyLocale("zh-CN", {});
+	pushNativeMenuLabels();
+	expect(sent[0]?.["desktop.menu.edit"]).toBe("编辑");
+	expect(sent[0]?.["desktop.dialog.startFailed"]).toBe("ThinkRail 无法启动");
+});

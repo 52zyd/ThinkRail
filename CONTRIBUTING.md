@@ -22,9 +22,9 @@ bug reports, include:
 Node.js ≥ 22.19 (required by the in-process `pi` engine), and an authenticated `pi` provider for agent work.
 
 ```bash
-git clone <repo-url>
-cd thinkrail
-bun install
+git clone https://github.com/dafeiyupp/ThinkRail.git
+cd ThinkRail
+bun install --frozen-lockfile
 bun run dev
 ```
 
@@ -53,12 +53,29 @@ CLI/desktop probes live in `packages/artifact-tests`, outside the application pa
 verification: the coordinated macOS release pipeline signs Electrobun's expanded app archive and finalizes
 the DMG, and that intermediate archive is not a public download.
 
+Windows installer smoke must run on a disposable GitHub-hosted runner. The installer writes real
+shortcuts and HKCU uninstall entries outside an isolated HOME; do not run it on your workstation or
+override the harness's environment guard. Expanded-application smoke can run locally with the
+harness's disposable home, data, agent and cache directories.
+
+The Windows package distributed with this fork lives in `bytools/`. Keep the setup executable and its
+adjacent `.installer` payload together; see [`bytools/README.txt`](bytools/README.txt) for the local build's
+signature, update-feed and verification limitations. Rebuilds appear in `apps/desktop/artifacts/`, not
+automatically in `bytools/`.
+The generated `.installer` payload is excluded from source formatting so its delivered bytes and
+checksums remain intact; do not hand-edit its metadata or compressed application archive.
+
 ## Repository layout
 
 [`architecture.md`](architecture.md) lists every app and package with its role and allowed dependencies;
 each module carries its own `SPEC.md`.
 
 ## Testing and linting
+
+Keep maintained unit tests, browser specs and fixtures in the repository. Do not commit local debug
+scripts, credentials, dependency caches, traces, reports or temporary screenshots. The root `.gitignore`
+already excludes `node_modules/`, `test-results*/`, `playwright-report*/`, `e2e/screenshots/` and desktop
+staging/build outputs. Deliberate README screenshots belong in `.github/readme-assets/`.
 
 Run the fast gates before opening a PR (they also run as the husky pre-commit hook):
 

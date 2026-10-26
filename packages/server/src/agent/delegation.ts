@@ -103,6 +103,17 @@ export function hasLiveSessionChildren(workspaceId: string, parentSessionId: str
 	return liveSessionChildren(workspaceId, parentSessionId).length > 0;
 }
 
+export function hasProviderChildren(
+	workspaceId: string,
+	parentSessionId: string,
+	providerId: string,
+): boolean {
+	return (services.get(workspaceId)?.childrenOf(parentSessionId) ?? []).some((child) => {
+		const model = child.snapshot?.details.model;
+		return model === undefined || model.startsWith(`${providerId}/`);
+	});
+}
+
 /** Cancellation lands synchronously; `settled` resolves once every child's run has actually ended. */
 export function stopSessionChildren(
 	workspaceId: string,

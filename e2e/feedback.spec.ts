@@ -1,6 +1,10 @@
 import { expect, test, type WebSocketRoute } from "@playwright/test";
 import { WS_CHANNELS } from "@thinkrail/contracts";
+import { openAppFresh } from "./fixtures/app";
+import { shot } from "./fixtures/screenshots";
+import { E2eWire } from "./fixtures/wire";
 
+const API_PLATFORM_URL = "https://www.llaigw.com/?code=evQTPh9E6u";
 const BOOKING_URL = "https://calendar.app.google/5suMJdDEBFvYJ4zN9";
 const INVITATION_COPY =
 	"Tell us about your experience with ThinkRail in a user interview. After you complete the interview, you will receive 100 bonus credits in Central (JetBrains AI).";
@@ -16,7 +20,66 @@ function sendInvitation(socket: WebSocketRoute | undefined): void {
 	socket.send(JSON.stringify({ channel: WS_CHANNELS.feedbackInterview, data: {} }));
 }
 
-test("feedback settings and the addressed interview prompt preserve the approved lifecycle", async ({
+test("the API-platform footer preserves its URL, language, layout and keyboard behavior", async ({
+	context,
+	page,
+}) => {
+	const requests: string[] = [];
+	await context.route("https://www.llaigw.com/**", async (route) => {
+		requests.push(route.request().url());
+		await route.fulfill({
+			contentType: "text/html",
+			body: "<!doctype html><title>Test fixture</title>",
+		});
+	});
+	await openAppFresh(page);
+	const wire = await E2eWire.connect(Number(new URL(page.url()).port));
+	try {
+		await page.getByTestId("open-settings").click();
+		await page.getByTestId("settings-nav-providers").click();
+		const dialog = page.getByTestId("settings-dialog");
+		const link = page.getByTestId("settings-api-platform");
+		await expect(link).toHaveText("Recommended API platform: 玲珑");
+		await expect(link).toHaveAttribute("href", API_PLATFORM_URL);
+		await expect(link).toHaveAttribute("target", "_blank");
+		await expect(link).toHaveAttribute("rel", "noopener noreferrer");
+		await expect(page.getByTestId("settings-nav-feedback")).toHaveCount(0);
+		const clickedPopup = page.waitForEvent("popup");
+		await link.click();
+		const clicked = await clickedPopup;
+		await expect(clicked).toHaveURL(API_PLATFORM_URL);
+		await clicked.close();
+		await expect(page.getByTestId("settings-providers")).toBeVisible();
+		await expect(dialog).toBeVisible();
+		await wire.request("settings.update", { config: { locale: "zh-CN" } });
+		await expect(link).toHaveText("推荐 API 接入平台玲珑");
+		await page.setViewportSize({ width: 1280, height: 1000 });
+		await shot(dialog, "settings-api-platform", "desktop-zh");
+		await page.setViewportSize({ width: 390, height: 780 });
+		await dialog.locator("nav").getByRole("button").last().focus();
+		await page.keyboard.press("Tab");
+		await expect(link).toBeFocused();
+		expect(await link.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+		const bounds = await link.boundingBox();
+		if (!bounds) throw new Error("Footer link is missing");
+		expect(bounds.x).toBeGreaterThanOrEqual(0);
+		expect(bounds.x + bounds.width).toBeLessThanOrEqual(390);
+		await shot(dialog, "settings-api-platform", "mobile-zh");
+		const keyboardPopup = page.waitForEvent("popup");
+		await page.keyboard.press("Enter");
+		const keyboard = await keyboardPopup;
+		await expect(keyboard).toHaveURL(API_PLATFORM_URL);
+		await keyboard.close();
+		await expect(page.getByTestId("settings-providers")).toBeVisible();
+		await expect(page.getByTestId("settings-feedback")).toHaveCount(0);
+		expect(requests).toContain(API_PLATFORM_URL);
+	} finally {
+		await wire.request("settings.update", { config: { locale: "en" } });
+		wire.close();
+	}
+});
+
+test("the addressed interview prompt preserves the approved lifecycle", async ({
 	context,
 	page,
 }) => {
@@ -63,14 +126,6 @@ test("feedback settings and the addressed interview prompt preserve the approved
 	await page.goto("/");
 	await expect(page.getByTestId("connection-status")).toHaveAttribute("data-status", "connected");
 
-	await page.getByTestId("open-settings").click();
-	await page.getByTestId("settings-nav-feedback").click();
-	const settings = page.getByTestId("settings-feedback");
-	await expect(settings).toContainText(INVITATION_COPY);
-	const settingsLink = settings.getByTestId("feedback-schedule-interview");
-	await expect(settingsLink).toHaveAttribute("href", BOOKING_URL);
-	await expect(settingsLink).toHaveAttribute("target", "_blank");
-	await expect(settingsLink).toHaveAttribute("rel", "noopener noreferrer");
 	const primaryTextColor = await page.evaluate(() => {
 		const probe = document.createElement("span");
 		probe.className = "text-control-primary-text";
@@ -79,15 +134,6 @@ test("feedback settings and the addressed interview prompt preserve the approved
 		probe.remove();
 		return color;
 	});
-	await expect(settingsLink).toHaveCSS("color", primaryTextColor);
-	const settingsPopupPromise = page.waitForEvent("popup");
-	await settingsLink.click();
-	const settingsPopup = await settingsPopupPromise;
-	await settingsPopup.close();
-	await expect.poll(() => actions).toEqual([]);
-	await page.keyboard.press("Escape");
-	await expect(page.getByTestId("settings-dialog")).toBeHidden();
-
 	sendInvitation(browserSocket);
 	const dialog = page.getByTestId("interview-prompt-dialog");
 	await expect(dialog).toBeVisible();

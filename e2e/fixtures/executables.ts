@@ -15,6 +15,21 @@ export function resolveBunExecutable(env: NodeJS.ProcessEnv = process.env): stri
 }
 
 export function hermeticE2ePath(fakeBinDir: string): string {
+	if (process.platform === "win32") {
+		const gitDirectory = (process.env.PATH ?? "")
+			.split(delimiter)
+			.find((directory) => existsSync(join(directory, "git.exe")));
+		if (!gitDirectory) throw new Error("git executable not found for the e2e host");
+		if (
+			["pi", "central", "code"].some((command) =>
+				["", ".exe", ".cmd", ".bat"].some((suffix) =>
+					existsSync(join(gitDirectory, command + suffix)),
+				),
+			)
+		)
+			throw new Error("e2e git directory must not contain production agent or editor executables");
+		return [fakeBinDir, gitDirectory].join(delimiter);
+	}
 	return [fakeBinDir, "/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(delimiter);
 }
 

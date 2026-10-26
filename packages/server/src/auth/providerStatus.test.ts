@@ -27,6 +27,19 @@ function sources(overrides: Partial<ProviderStatusSources> = {}): ProviderStatus
 }
 
 describe("buildProviderReport", () => {
+	test("managed compatible rows are marked without changing built-in provider rows", () => {
+		const report = buildProviderReport(
+			sources({
+				modelProviderIds: new Set(["openai", "local"]),
+				availableProviders: new Set(["openai", "local"]),
+				compatibleProviders: new Set(["local"]),
+			}),
+		);
+		expect(report.providers.find((provider) => provider.id === "local")?.compatible).toBe(true);
+		expect(report.providers.find((provider) => provider.id === "openai")).not.toHaveProperty(
+			"compatible",
+		);
+	});
 	test("empty runtime carries the closed Central state and install plan", () => {
 		expect(buildProviderReport(sources())).toEqual({
 			providers: [],

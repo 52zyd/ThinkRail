@@ -10,6 +10,10 @@ tags: [i18n]
 
 ## Responsibility
 
+New/missing UI preferences default to Simplified Chinese; explicit preferences are preserved, including
+English and system-following. English remains the source and fallback. Translation covers owned UI
+only, not agent replies, tool output, code, model IDs or third-party errors.
+
 The single owner of ThinkRail's UI strings and of the rules every locale source obeys
 ([[architecture]] Decision 23). It ships the bundled catalogs — `en.json` is the English source of truth
 and the file translators start from, `zh-CN.json` is the Simplified Chinese translation — and the pure

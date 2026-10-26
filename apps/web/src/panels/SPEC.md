@@ -11,6 +11,12 @@ tags: [ui]
 
 ## Responsibility
 
+Providers includes a protocol-gated compatible-service group with CRUD, explicit protocol selection,
+manual model declarations and opt-in `/models` discovery. Keys stay in transient password inputs;
+blank edits preserve them and an explicit no-key switch clears them. Discovery failures retain drafts.
+Associated chats must close before routing changes/removal. Forms reuse owned primitives and semantic
+tokens. The UI never infers model capabilities or represents absent custom prices as free service.
+
 The layout-agnostic, store-driven feature views. A panel fills its container and never knows its
 arrangement (so the mobile shell is an additive layer, not a rewrite).
 
@@ -509,8 +515,11 @@ a project picker, the prompt hero, and the reused
   **Interface** (Chat, Appearance, Language, Layout, Terminal) · **System** (Workspaces, Integrations, Extensions,
   Notifications, Privacy, Updates). Integrations keeps section id `github`: today it is the GitHub CLI page
   and it is the home for further integrations. Below `md` the same list is a horizontal scrolling strip without group labels. The
-  Feedback card (`settings-nav-feedback`, “Get 100 credits for a user interview”) belongs to that list at
-  every width, pinned to the rail's bottom at `md`+. The pure nav data — groups, protocol and
+  API-platform recommendation (`settings-api-platform`) belongs to that list at every width, pinned to
+  the rail's bottom at `md`+. It is a real anchor that preserves the configured referral URL, opening
+  a new tab with `noopener noreferrer`, without changing
+  the selected section or calling feedback APIs. It preserves the existing green bordered treatment.
+  The pure nav data — groups, protocol and
   injected-content gating, and resolving a requested section to an available one (a gated or retired id,
   e.g. an old `review` / `line-width` deep link, falls back to Appearance) — lives in `panels/settingsNav.ts`,
   so the dialog only renders it. `settingsOpen`/`settingsSection` live in the store so the gear AND the
@@ -862,13 +871,13 @@ a project picker, the prompt hero, and the reused
   decisions survive restarts and change later through Settings. The dialog keeps only the short
   product-usage copy and shared switch; Settings adds the optional outcomes, report dimensions, and
   excluded content. Older hosts retain their legacy privacy control without the new consent dialog.
-  **`FeedbackSettings`** is the final
-  live section after Privacy: the same interview copy as the automatic prompt, stating that completing a
+  **`FeedbackSettings`** remains a live section for existing deep links, but is no longer advertised in
+  the navigation rail: the same interview copy as the automatic prompt, stating that completing a
   user interview about the participant's ThinkRail experience earns 100 bonus credits in Central
   (JetBrains AI) — credits, never a currency amount — plus a real external anchor to the fixed Google
   Calendar booking page, opened in a new tab with `noopener noreferrer`. ThinkRail communicates the
   incentive only; attendance verification, eligibility, and credit fulfillment stay outside the app. This
-  proactive Settings link is always available and deliberately does not call `feedback.respond`, alter
+  booking anchor deliberately does not call `feedback.respond`, alter
   automatic-popup state, or claim that booking alone earns credits.
   **`ModelsSettings`** is the **Models** section, visible only at protocol v72 or newer. It re-reads
   `model.default` on open, whenever the live catalog changes (empty included), and after every save — the

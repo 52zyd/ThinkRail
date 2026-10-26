@@ -2,6 +2,7 @@ import type { AppConfig } from "@thinkrail/contracts";
 import { E2eWire } from "./wire";
 
 export const CONFIRMED_ANALYTICS_CONFIG = {
+	locale: "en",
 	analyticsEnabled: false,
 	analyticsConsentConfirmed: true,
 };
@@ -15,7 +16,7 @@ export async function seedAnalyticsConsent(
 	const wire = await E2eWire.connect(Number(new URL(baseURL).port));
 	try {
 		return await wire.request("settings.update", {
-			config: { analyticsEnabled, analyticsConsentConfirmed },
+			config: { locale: "en", analyticsEnabled, analyticsConsentConfirmed },
 		});
 	} finally {
 		wire.close();

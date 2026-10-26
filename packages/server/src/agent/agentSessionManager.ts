@@ -89,6 +89,7 @@ import { publishSessionResourcesChanged } from "./chatResources";
 import {
 	disposeSessionChildren,
 	hasLiveSessionChildren,
+	hasProviderChildren,
 	removeWorkspaceDelegation,
 	stopSessionChildren,
 	subagentsFor,
@@ -117,6 +118,7 @@ import {
 	refreshCatalogs,
 	settledAvailableModels,
 } from "./piRuntime";
+import { isCompatibleProviderId, reserveModelProvider } from "./providerAdmission";
 import { catalogProviderAuth } from "./providerAuth";
 import { REQUEST_REVIEW_TOOL_NAME } from "./requestReviewTool";
 import { projectSessionEvent } from "./sessionEventProjection";
@@ -180,6 +182,23 @@ const workspaceLifecycleGenerations = new Map<string, number>();
 const closingWorkspaces = new Map<string, number>();
 const pendingSessionPreparations = new Map<string, Set<Promise<unknown>>>();
 const sessionTeardowns = new Map<string, Promise<void>>();
+
+export function assertCompatibleProviderIdle(providerId: string): void {
+	if (
+		pendingSessionPreparations.size > 0 ||
+		sessionTeardowns.size > 0 ||
+		[...sessions.values()].some(
+			(entry) =>
+				entry.session.model?.provider === providerId ||
+				hasProviderChildren(entry.workspaceId, entry.session.sessionId, providerId),
+		)
+	) {
+		throw new CodedError(
+			"COMPATIBLE_IN_USE",
+			"Close associated chats and subagents before updating this provider.",
+		);
+	}
+}
 
 interface WorkspaceLifecycleToken {
 	global: number;
@@ -963,7 +982,9 @@ export function toWireModel(model: Model<string>, auth?: WireModelAuth): WireMod
 		contextWindow: model.contextWindow,
 		reasoning: model.reasoning,
 		thinkingLevels: getSupportedThinkingLevels(model),
-		cost: { input: model.cost.input, output: model.cost.output },
+		...(!isCompatibleProviderId(model.provider)
+			? { cost: { input: model.cost.input, output: model.cost.output } }
+			: {}),
 		input: [...model.input],
 		...(auth ? { auth } : {}),
 	};
@@ -1292,9 +1313,10 @@ function createParentSession(
 	const sessionId = options.sessionManager.getSessionId();
 	if (sessionIsTearingDown(sessionId))
 		return Promise.reject(new Error(`Unknown session: ${sessionId}`));
+	const release = reserveModelProvider(options.model?.provider);
 	return trackSessionPreparation(workspaceId, lifecycleToken, () =>
 		createParentSessionInternal(options, workspaceId, generation, lifecycleToken, announceCreation),
-	);
+	).finally(release);
 }
 
 async function createParentSessionInternal(
@@ -2363,10 +2385,15 @@ async function abortEntry(
 }
 
 export async function setSessionModel(sessionId: string, model: WireModel): Promise<WireModel> {
-	const entry = mustGetEntry(sessionId);
-	const resolved = resolveWireModel(entry.generation.runtime, model);
-	await entry.session.setModel(resolved);
-	return sessionWireModel(resolved, entry.generation);
+	const release = reserveModelProvider(model.provider);
+	try {
+		const entry = mustGetEntry(sessionId);
+		const resolved = resolveWireModel(entry.generation.runtime, model);
+		await entry.session.setModel(resolved);
+		return sessionWireModel(resolved, entry.generation);
+	} finally {
+		release();
+	}
 }
 
 export function setSessionThinkingLevel(sessionId: string, level: ThinkingLevel): void {

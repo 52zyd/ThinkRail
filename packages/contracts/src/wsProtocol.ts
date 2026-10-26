@@ -6,6 +6,8 @@ import type {
 	BranchList,
 	BranchStatus,
 	ChangeReceipt,
+	CompatibleProvider,
+	CompatibleProviderInput,
 	DelegationRunDetails,
 	DelegationRunStatus,
 	DiffStats,
@@ -117,7 +119,8 @@ export type TemplateReadLocation =
 	| { projectId: string; workspaceId?: never }
 	| { workspaceId?: never; projectId?: never };
 
-export const PROTOCOL_VERSION = 90;
+export const PROTOCOL_VERSION = 91;
+export const COMPATIBLE_PROVIDERS_PROTOCOL_VERSION = 91;
 export const CLIENT_ERROR_REPORT_PROTOCOL_VERSION = 90;
 export const LOCALES_PROTOCOL_VERSION = 89;
 export const REVIEW_ACTIONS_PROTOCOL_VERSION = 88;
@@ -309,6 +312,10 @@ export const WS_METHODS = {
 	modelSetContextWindow: "model.setContextWindow",
 	modelClampThinking: "model.clampThinking",
 	providerStatus: "provider.status",
+	providerCompatibleList: "provider.compatibleList",
+	providerCompatibleSave: "provider.compatibleSave",
+	providerCompatibleRemove: "provider.compatibleRemove",
+	providerCompatibleDiscover: "provider.compatibleDiscover",
 	providerLoginStart: "provider.loginStart",
 	providerLoginReply: "provider.loginReply",
 	providerLoginCancel: "provider.loginCancel",
@@ -885,6 +892,13 @@ export interface WsMethodMap {
 		result: ModelContextSetting[];
 	};
 	"provider.status": { params: Record<string, never>; result: ProviderStatusReport };
+	"provider.compatibleList": { params: Record<string, never>; result: CompatibleProvider[] };
+	"provider.compatibleSave": { params: CompatibleProviderInput; result: CompatibleProvider };
+	"provider.compatibleRemove": { params: { id: string; revision: string }; result: Ack };
+	"provider.compatibleDiscover": {
+		params: Pick<CompatibleProviderInput, "id" | "baseUrl" | "apiKey">;
+		result: string[];
+	};
 	"provider.loginStart": {
 		params: { providerId: string; type?: "oauth" | "api_key" };
 		result: { loginId: string };
@@ -1050,6 +1064,12 @@ export interface WsResume {
 export type WsClientMessage = WsRequest | WsAck | WsResume;
 
 export type WsErrorCode =
+	| "COMPATIBLE_INVALID"
+	| "COMPATIBLE_IN_USE"
+	| "COMPATIBLE_CONFIG_FAILED"
+	| "COMPATIBLE_DISCOVERY_FAILED"
+	| "COMPATIBLE_KEY_FAILED"
+	| "COMPATIBLE_STALE"
 	| "UNKNOWN_COMMIT"
 	| "PUSH_AUTH_FAILED"
 	| "NOT_GIT"

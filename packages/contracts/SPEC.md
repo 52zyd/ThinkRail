@@ -89,6 +89,14 @@ default, narrow cross-ring guards, and the quit-confirmation rule both clients d
 
 ## Contents
 
+Compatible-provider management (protocol v91) has four methods: `provider.compatibleList`,
+`provider.compatibleSave`, `provider.compatibleRemove`, and `provider.compatibleDiscover`.
+Descriptors expose name, base URL, selected API, model declarations, revision, and key-presence only.
+Write-only `apiKey` is omitted to retain a key, a string to replace it, or `null` for no-key mode.
+Discovery accepts an unsaved configuration and returns model IDs only. Existing `WireModel` remains
+credential-blind. Closed compatible-provider failure codes let clients render translated recovery text.
+`ProviderStatus.compatible` marks managed rows so settings do not expose a second generic key editor.
+
 - **piProtocol.ts** — `import type` re-exports from the pi package roots (type-only → erased at build):
   - `@earendil-works/pi-ai`: `Model`, `Message`, `UserMessage`, `AssistantMessage`,
     `ToolResultMessage`, `TextContent`, `ThinkingContent`, `ImageContent`, `ToolCall`,

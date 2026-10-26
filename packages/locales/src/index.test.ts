@@ -176,6 +176,10 @@ describe("bundled non-English catalogs follow en.json", () => {
 			expect(keys).toEqual([...keys].sort());
 		});
 
+		test(`${tag}: all English UI keys have translations`, () => {
+			expect(Object.keys(EN).filter((key) => !Object.hasOwn(catalog, key))).toEqual([]);
+		});
+
 		test(`${tag}: every translated plural family has each form the language needs`, () => {
 			const completed = completePlurals(tag, catalog);
 			expect(Object.keys(completed).filter((key) => !Object.hasOwn(catalog, key))).toEqual([]);

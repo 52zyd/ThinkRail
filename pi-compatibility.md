@@ -97,6 +97,15 @@ full-output paths; run `mcp/results.test.ts`, `mcpEngine.test.ts`, web MCP card 
 
 ## Other pi-sensitive host seams
 
+- **Compatible-provider configuration writer** — `agent/modelsConfig` and `compatibleProviders`.
+  The pinned SDK exposes `ModelRuntime` refresh/login/logout but no public `models.json` writer or
+  config validator export. Retain the shared JSONC-safe writer and validate the edited UI contract;
+  pi remains the model/auth authority. Removal gate: a public writer preserving comments, BOM,
+  symlinks, stale-write detection and atomic replacement, plus credential-blind configuration reads.
+  Verify `modelContext`, `modelsConfig`, and compatible-provider tests against each SDK upgrade.
+  The same fixture suite pins `$`/`!` literal escaping required by pi's file credential resolver;
+  remove the escaping only when public login/store round-trips arbitrary literal keys directly.
+
 - **Image-only queued input** — [[submodule-server-agent]], queue projection. The host compensates for
   pi's text-only delivered-message removal ([upstream #8612](https://github.com/earendil-works/pi/issues/8612))
   and retains image content lost by the destructive queue API. Remove the corresponding workaround

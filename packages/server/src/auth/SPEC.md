@@ -11,6 +11,12 @@ tags: [auth, pi]
 
 ## Responsibility
 
+Compatible-service settings are owned by agent, not a second auth subsystem. Its controlled login
+adapter answers the verified, single secret prompt of a host-generated compatible provider; it never
+answers prompts of arbitrary built-ins. Write-only form keys travel client-to-host, never on read
+responses or broadcasts. Provider status also admits current owned compatible IDs, never opaque
+Central registrations, so a newly saved service is visible without restarting the host.
+
 Everything about **model-provider credentials**: the read side the Welcome strip renders
 (`provider.status`) and the write side that configures them from inside the app — OAuth sign-in,
 interactive API-key entry (both over the **same login channel**, issue #97), and logout. All of it goes

@@ -147,7 +147,7 @@ test("saving 1M updates Pi metadata for new chats, keeps live session models, an
 		expect(config()).toEqual({
 			providers: { openai: { modelOverrides: { "gpt-5.5": { contextWindow: 1_000_000 } } } },
 		});
-		expect(statSync(path).mode & 0o777).toBe(0o600);
+		if (process.platform !== "win32") expect(statSync(path).mode & 0o777).toBe(0o600);
 		expect(published).toBe(1);
 		await setModelContextWindow(ref, 1_000_000);
 		expect(published).toBe(1);
@@ -181,7 +181,7 @@ test("Default removes only the override and preserves credentials, comments, mod
 	});
 	expect(pi.getModel("openai", "gpt-5.5")?.maxTokens).toBe(8192);
 	expect(pi.getError()).toBeUndefined();
-	expect(statSync(path).mode & 0o777).toBe(0o640);
+	if (process.platform !== "win32") expect(statSync(path).mode & 0o777).toBe(0o640);
 });
 
 test("Default prunes override objects it empties but never the providers map", async () => {
@@ -313,29 +313,47 @@ test("a read-only models.json is refused and left byte-for-byte intact", async (
 	expect(temporaryFiles()).toEqual([]);
 });
 
-test("writes follow a symlinked models.json and leave no temporary files", async () => {
-	const target = join(directory, "dotfiles-models.json");
-	writeFileSync(target, '{"providers":{}}');
-	symlinkSync(target, path);
-	await runtime();
-	await setModelContextWindow(ref, 1_000_000);
-	expect(lstatSync(path).isSymbolicLink()).toBe(true);
-	expect(readFileSync(target, "utf8")).toContain("1000000");
-	expect(temporaryFiles()).toEqual([]);
-});
+const canSymlink = (() => {
+	const probe = mkdtempSync(join(tmpdir(), "thinkrail-symlink-probe-"));
+	try {
+		symlinkSync(join(probe, "target"), join(probe, "link"));
+		return true;
+	} catch {
+		return false;
+	} finally {
+		rmSync(probe, { recursive: true, force: true });
+	}
+})();
 
-test("a dangling models.json symlink is kept and its missing target is created", async () => {
-	const target = join(directory, "dotfiles", "pi", "models.json");
-	symlinkSync(target, path);
-	await runtime();
-	await setModelContextWindow(ref, 1_000_000);
-	expect(lstatSync(path).isSymbolicLink()).toBe(true);
-	expect(JSON.parse(readFileSync(target, "utf8"))).toEqual({
-		providers: { openai: { modelOverrides: { "gpt-5.5": { contextWindow: 1_000_000 } } } },
-	});
-	expect(statSync(target).mode & 0o777).toBe(0o600);
-	expect(temporaryFiles()).toEqual([]);
-});
+test.skipIf(!canSymlink)(
+	"writes follow a symlinked models.json and leave no temporary files",
+	async () => {
+		const target = join(directory, "dotfiles-models.json");
+		writeFileSync(target, '{"providers":{}}');
+		symlinkSync(target, path);
+		await runtime();
+		await setModelContextWindow(ref, 1_000_000);
+		expect(lstatSync(path).isSymbolicLink()).toBe(true);
+		expect(readFileSync(target, "utf8")).toContain("1000000");
+		expect(temporaryFiles()).toEqual([]);
+	},
+);
+
+test.skipIf(!canSymlink)(
+	"a dangling models.json symlink is kept and its missing target is created",
+	async () => {
+		const target = join(directory, "dotfiles", "pi", "models.json");
+		symlinkSync(target, path);
+		await runtime();
+		await setModelContextWindow(ref, 1_000_000);
+		expect(lstatSync(path).isSymbolicLink()).toBe(true);
+		expect(JSON.parse(readFileSync(target, "utf8"))).toEqual({
+			providers: { openai: { modelOverrides: { "gpt-5.5": { contextWindow: 1_000_000 } } } },
+		});
+		if (process.platform !== "win32") expect(statSync(target).mode & 0o777).toBe(0o600);
+		expect(temporaryFiles()).toEqual([]);
+	},
+);
 
 test("concurrent saves serialize so neither edit is lost", async () => {
 	await runtime([

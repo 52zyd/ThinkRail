@@ -32,7 +32,6 @@ export function SettingsDialog({
 	const protocolVersion = useAppStore((s) => s.protocolVersion);
 	const filteredGroups = settingsNavGroups(protocolVersion, updateSettings !== undefined);
 	const selectedSection = resolveSettingsSection(section, filteredGroups);
-	const feedbackActive = selectedSection === SettingsSection.Feedback;
 
 	return (
 		<Dialog
@@ -93,18 +92,15 @@ export function SettingsDialog({
 							</div>
 						))}
 
-						<button
-							type="button"
-							data-testid="settings-nav-feedback"
-							data-active={feedbackActive}
-							onClick={() => useAppStore.getState().setSettingsSection(SettingsSection.Feedback)}
-							className={cn(
-								"shrink-0 rounded-sm border border-primary-soft px-8 py-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-primary md:mt-auto md:px-12 md:py-8",
-								feedbackActive ? "bg-primary-subtle" : "bg-control-bg hover:bg-control-bg-hovered",
-							)}
+						<a
+							data-testid="settings-api-platform"
+							href="https://www.llaigw.com/?code=evQTPh9E6u"
+							target="_blank"
+							rel="noopener noreferrer"
+							className="shrink-0 rounded-sm border border-primary-soft bg-control-bg px-8 py-4 text-left outline-none transition-colors hover:bg-control-bg-hovered focus-visible:ring-2 focus-visible:ring-primary md:mt-auto md:px-12 md:py-8"
 						>
-							<span className="tr-text-ui text-primary">{t("settings.dialog.interviewCta")}</span>
-						</button>
+							<span className="tr-text-ui text-primary">{t("settings.dialog.apiPlatformCta")}</span>
+						</a>
 					</nav>
 
 					<div className="min-h-0 flex-1 overflow-y-auto p-16">

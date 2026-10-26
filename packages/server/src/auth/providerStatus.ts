@@ -6,6 +6,7 @@ import type {
 } from "@thinkrail/contracts";
 import { jbcentralInstall } from "@thinkrail/shared/jbcentral";
 import {
+	compatibleProviderIds,
 	describeProviderAuth,
 	type ProviderAuthFacts,
 	settledAvailableModels,
@@ -17,6 +18,7 @@ export interface ProviderStatusSources {
 	modelProviderIds: Set<string>;
 	availableProviders: Set<string>;
 	centralProviders: Set<string>;
+	compatibleProviders?: ReadonlySet<string>;
 	credentialProviders: string[];
 	oauthProviders: { id: string; name: string }[];
 	credentialType: (id: string) => "oauth" | "api_key" | undefined;
@@ -43,6 +45,7 @@ export function buildProviderReport(sources: ProviderStatusSources): ProviderSta
 		const canOAuth = oauthIds.has(id);
 		const canApiKey = sources.apiKeyLogin(id);
 		const login = {
+			...(sources.compatibleProviders?.has(id) ? { compatible: true as const } : {}),
 			...(canOAuth ? { canOAuth: true } : {}),
 			...(canApiKey ? { canApiKey: true } : {}),
 			...(removable.has(id) ? { canLogout: true } : {}),
@@ -78,7 +81,10 @@ export async function getProviderStatus(): Promise<ProviderStatusReport> {
 	const jbcentral = await getJbcentralStatus();
 	const install = jbcentralInstall(process.platform);
 	return usePiRuntime(async (runtime, generation) => {
-		const providerStatusIds = [...generation.providerStatusIds];
+		const compatibleIds = compatibleProviderIds().filter(
+			(id) => !generation.opaqueProviderIds.has(id),
+		);
+		const providerStatusIds = [...new Set([...generation.providerStatusIds, ...compatibleIds])];
 		try {
 			await runtime.refresh({ providers: providerStatusIds });
 		} catch {
@@ -110,6 +116,7 @@ export async function getProviderStatus(): Promise<ProviderStatusReport> {
 			),
 			availableProviders: new Set(available.map((model) => model.provider)),
 			centralProviders,
+			compatibleProviders: new Set(compatibleIds),
 			credentialProviders: visibleCredentials.map((credential) => credential.providerId),
 			oauthProviders: visibleProviders
 				.filter((provider) => provider.auth.oauth)

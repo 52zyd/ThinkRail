@@ -20,6 +20,26 @@ answer-injection path, and the **restart repair** that keeps re-opened transcrip
 
 ## Boundary
 
+OpenAI-compatible settings are a narrow adapter over pi's `models.json` and public credential API.
+Only host-generated `thinkrail-openai-<uuid>` providers are managed. Reads are explicit allowlists;
+keys never return to clients. `modelsConfig` serializes both compatible-provider and context saves,
+preserves JSONC/BOM/symlinks, checks for external edits, and atomically replaces the resolved file.
+Credentials remain in pi's store; no-key services use a fixed non-secret placeholder. Endpoint or
+protocol changes and deletion require associated live chats/children to be closed; provider admission
+is fenced during writes. Discovery is explicit, bounded, and refuses redirects. Model limits and
+capabilities are user declarations, not inferred facts; pi defaults apply when omitted.
+
+Routing edits replace the generated provider identity and migrate its key through pi before removing
+the old credential. Retained/candidate runtimes can therefore never resolve a new key for an old URL.
+Model references to the old identity must be reselected; defaults are not silently rewritten. Literal
+keys escape pi's `$`/`!` configuration syntax before public login, so form data cannot run a command.
+Opaque extension overrides are excluded from management. Model-level routing/header overrides are
+removed when saving a service so every declaration uses the service's selected endpoint and protocol.
+The form reflects known modelOverrides; saving folds these controlled fields into declarations and
+removes their duplicate override values while keeping unrelated override metadata.
+The barrel exposes `listCompatibleProviders`, `saveCompatibleProvider`, `removeCompatibleProvider`,
+and `discoverCompatibleModels` to host, plus `compatibleProviderIds` for auth status composition.
+
 - **Owns:**
   - `piRuntime` (the current shared `ModelRuntime` generation — pi's canonical model/auth facade for
     catalogs, credentials, availability, login/logout, and request dispatch). Sibling consumers use the

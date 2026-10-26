@@ -15,6 +15,7 @@ import {
 	CHANGE_MUTATIONS_PROTOCOL_VERSION,
 	CHAT_RESOURCES_PROTOCOL_VERSION,
 	CLIENT_ERROR_REPORT_PROTOCOL_VERSION,
+	COMPATIBLE_PROVIDERS_PROTOCOL_VERSION,
 	CONTEXT_WINDOW_SETTINGS_PROTOCOL_VERSION,
 	customMessageText,
 	DEFAULT_MODEL_PROTOCOL_VERSION,
@@ -217,9 +218,18 @@ test("local language files and the locale setting are pinned to v89", () => {
 });
 
 test("client error reports are pinned to v90", () => {
-	expect(PROTOCOL_VERSION).toBe(90);
+	expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(CLIENT_ERROR_REPORT_PROTOCOL_VERSION);
 	expect(CLIENT_ERROR_REPORT_PROTOCOL_VERSION).toBe(90);
 	expect(WS_METHODS.clientReportError).toBe("client.reportError");
+});
+
+test("compatible provider management advances the protocol", () => {
+	expect(PROTOCOL_VERSION).toBe(91);
+	expect(COMPATIBLE_PROVIDERS_PROTOCOL_VERSION).toBe(91);
+	expect(WS_METHODS.providerCompatibleList).toBe("provider.compatibleList");
+	expect(WS_METHODS.providerCompatibleSave).toBe("provider.compatibleSave");
+	expect(WS_METHODS.providerCompatibleRemove).toBe("provider.compatibleRemove");
+	expect(WS_METHODS.providerCompatibleDiscover).toBe("provider.compatibleDiscover");
 });
 
 test("project rename is pinned to v85", () => {

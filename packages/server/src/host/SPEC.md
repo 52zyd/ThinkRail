@@ -15,6 +15,11 @@ channel fan-out, and the process-boot wrapper both launchers share.
 
 ## Boundary
 
+The four protocol-v91 `provider.compatible*` handlers delegate to agent's provider-settings adapter;
+the existing `provider.changed` broadcast invalidates both model and configuration reads. Responses
+contain only allowlisted configuration, model declarations and key-presence; credential values stay
+write-only. Closed failure codes let the UI translate recovery text without forwarding remote bodies.
+
 - **Owns:** `server.ts` (async `createServer` first asks auth to start Central artifact watching and publish
   the initial current PI runtime, falling back to plain PI with closed `load-failed` state when needed, then creates
   `Bun.serve` with `/health`, `/ws` upgrade, a
