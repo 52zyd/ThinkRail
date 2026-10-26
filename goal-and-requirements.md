@@ -112,10 +112,14 @@ What ThinkRail does, at product level; the linked spec owns the detail.
   ([[submodule-server-agent]], [[submodule-web-panels]]).
 - **Around the workspace** — open a worktree in an installed editor or IDE, and keep the app itself up
   to date ([[submodule-server-editors]], [[submodule-web-updates]]).
-- **Interface language** — the UI follows the system language or the user's choice; English and
+- **Interface language** — new or missing preferences default to Simplified Chinese; an explicit saved
+  preference is preserved, including English and following the system. English and
   Simplified Chinese ship built-in (an untranslated string shows in English), and a user adds or
   overrides a language with a flat JSON file in `~/.thinkrail/locales`, live on save. Agent and tool
   output is never translated ([[module-locales]], [[submodule-web-i18n]]).
+- **Local diagnostics** — application usage statistics, remote error reporting and browser attribution
+  are absent in this fork. Local logs, crash records and UI recovery remain; user-configured services,
+  third-party extensions and the repository update feed retain their own network behavior.
 - **Brand** — ThinkRail green accent (bright on dark themes, deepened on light ones so it clears AA on
   both), a Darcula-family dark background, Orbitron for the brand display role, Geist and JetBrains Mono
   for UI and code ([[submodule-web-themes]], [[web-typography]]).
