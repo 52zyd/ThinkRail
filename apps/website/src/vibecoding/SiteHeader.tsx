@@ -49,7 +49,7 @@ export function SiteHeader() {
 							showGithub ? "opacity-100" : "pointer-events-none opacity-0"
 						}`}
 					>
-						<ActionButton href="https://github.com/JetBrains/thinkrail" variant="secondary">
+						<ActionButton href="https://github.com/52zyd/ThinkRail" variant="secondary">
 							<GithubIcon className="h-6 w-6 shrink-0" />
 							Star on GitHub
 						</ActionButton>

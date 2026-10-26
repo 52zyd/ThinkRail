@@ -1,6 +1,6 @@
 import { expect, spyOn, test } from "bun:test";
 import { shallowEqualArrays } from "../lib";
-import { ErrorBoundary, isChunkLoadError, setErrorBoundaryReporter } from "./ErrorBoundary";
+import { ErrorBoundary, isChunkLoadError } from "./ErrorBoundary";
 
 test("classifies failed dynamic imports (stale Vite chunk / 504) as chunk-load errors", () => {
 	expect(
@@ -33,23 +33,15 @@ test("resetKeys recovery: equal keys keep the error, a changed key clears it", (
 	expect(shallowEqualArrays(undefined, undefined)).toBe(true);
 });
 
-test("a caught render error reaches the installed reporter with its untranslated report id", () => {
-	const seen: Array<[Error, string | undefined]> = [];
-	const consoleError = spyOn(console, "error").mockImplementation(() => {});
+test("caught render errors stay local and preserve recovery", () => {
+	const output = spyOn(console, "error").mockImplementation(() => {});
 	try {
-		setErrorBoundaryReporter((error, reportId) => {
-			seen.push([error, reportId]);
-			throw new Error("reporter failure must not escape");
-		});
-		const boom = new Error("boom");
-		new ErrorBoundary({ label: "Чат", reportId: "chat", children: null }).componentDidCatch(boom, {
-			componentStack: "",
-		});
-		setErrorBoundaryReporter(null);
-		new ErrorBoundary({ children: null }).componentDidCatch(boom, { componentStack: "" });
-		expect(seen).toEqual([[boom, "chat"]]);
+		const error = new Error("boom");
+		const boundary = new ErrorBoundary({ label: "Chat", children: null });
+		boundary.componentDidCatch(error, { componentStack: "" });
+		expect(output).toHaveBeenCalledTimes(1);
+		expect(ErrorBoundary.getDerivedStateFromError(error)).toEqual({ error });
 	} finally {
-		setErrorBoundaryReporter(null);
-		consoleError.mockRestore();
+		output.mockRestore();
 	}
 });

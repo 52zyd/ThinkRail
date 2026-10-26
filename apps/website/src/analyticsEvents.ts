@@ -16,7 +16,7 @@ import {
 import { installCommands } from "./installCommands";
 
 const maxContentKeyLength = 105;
-const githubRepositoryUrl = "https://github.com/JetBrains/thinkrail";
+const githubRepositoryUrl = "https://github.com/52zyd/ThinkRail";
 
 type DesktopArtifact = Pick<
 	WebsiteDownloadStartedProperties,
@@ -56,25 +56,24 @@ export type DesktopClickEvents = readonly [
 ];
 
 const stableDesktopArtifacts = {
-	"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-darwin-arm64.dmg":
+	"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-darwin-arm64.dmg":
 		{
 			platform: "macos",
 			architecture: "arm64",
 			artifact: "dmg",
 		},
-	"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-windows-x64.zip":
-		{
-			platform: "windows",
-			architecture: "x64",
-			artifact: "zip",
-		},
-	"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-linux-x64.tar.gz":
+	"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-windows-x64.zip": {
+		platform: "windows",
+		architecture: "x64",
+		artifact: "zip",
+	},
+	"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-linux-x64.tar.gz":
 		{
 			platform: "linux",
 			architecture: "x64",
 			artifact: "tar.gz",
 		},
-	"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-linux-arm64.tar.gz":
+	"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-linux-arm64.tar.gz":
 		{
 			platform: "linux",
 			architecture: "arm64",

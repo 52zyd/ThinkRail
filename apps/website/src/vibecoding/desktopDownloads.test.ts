@@ -30,10 +30,10 @@ describe("desktop install model", () => {
 				platform.desktop.downloads.map((download) => download.href),
 			),
 		).toEqual([
-			"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-darwin-arm64.dmg",
-			"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-windows-x64.zip",
-			"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-linux-x64.tar.gz",
-			"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-linux-arm64.tar.gz",
+			"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-darwin-arm64.dmg",
+			"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-windows-x64.zip",
+			"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-linux-x64.tar.gz",
+			"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-linux-arm64.tar.gz",
 		]);
 	});
 
@@ -99,7 +99,7 @@ describe("server-rendered install controls", () => {
 		expect(markup).toContain('aria-label="macOS desktop downloads"');
 		expect(markup).not.toContain("<details");
 		expect(markup).not.toContain("Browser UI via command line");
-		expect(markup).not.toContain("raw.githubusercontent.com/JetBrains/thinkrail");
+		expect(markup).not.toContain("raw.githubusercontent.com/52zyd/ThinkRail");
 		expect(markup).toContain('href="#quick-start"');
 		expect(markup).toContain("View desktop downloads");
 		expect(markup).not.toContain("All platforms");

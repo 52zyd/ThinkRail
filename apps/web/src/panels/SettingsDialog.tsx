@@ -12,7 +12,6 @@ import { LanguageSettings } from "./LanguageSettings";
 import { McpSettings } from "./McpSettings";
 import { ModelsSettings } from "./ModelsSettings";
 import { NotificationsSettings } from "./NotificationsSettings";
-import { PrivacySettings } from "./PrivacySettings";
 import { ProvidersSettings } from "./ProvidersSettings";
 import { resolveSettingsSection, settingsNavGroups } from "./settingsNav";
 import { TemplatesSettings } from "./TemplatesSettings";
@@ -130,8 +129,6 @@ export function SettingsDialog({
 							<GithubSettings />
 						) : selectedSection === SettingsSection.Notifications ? (
 							<NotificationsSettings />
-						) : selectedSection === SettingsSection.Privacy ? (
-							<PrivacySettings />
 						) : selectedSection === SettingsSection.Updates && updateSettings !== undefined ? (
 							updateSettings
 						) : selectedSection === SettingsSection.Feedback ? (

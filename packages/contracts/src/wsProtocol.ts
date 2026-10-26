@@ -119,7 +119,7 @@ export type TemplateReadLocation =
 	| { projectId: string; workspaceId?: never }
 	| { workspaceId?: never; projectId?: never };
 
-export const PROTOCOL_VERSION = 91;
+export const PROTOCOL_VERSION = 92;
 export const COMPATIBLE_PROVIDERS_PROTOCOL_VERSION = 91;
 export const CLIENT_ERROR_REPORT_PROTOCOL_VERSION = 90;
 export const LOCALES_PROTOCOL_VERSION = 89;
@@ -146,7 +146,6 @@ export const PLAN_REVIEW_SUBAGENT_PROTOCOL_VERSION = 67;
 export const AGENT_REVIEW_SETTING_PROTOCOL_VERSION = 68;
 export const PLAN_SUMMARY_GENERATION_PROTOCOL_VERSION = 69;
 export const SESSION_STATE_PROTOCOL_VERSION = 73;
-export const ANALYTICS_CONSENT_PROTOCOL_VERSION = 65;
 export const SESSION_RENAME_PROTOCOL_VERSION = 66;
 export const SESSION_TITLE_MAX_LENGTH = 80;
 

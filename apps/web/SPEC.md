@@ -83,13 +83,7 @@ reads `bun.lock` and rejects any second `react` or `react-dom` version. Every Re
 packages together and repeats the mounted-chat memory stress probe before this temporary canary pin can
 return to stable.
 
-**Release source maps are build-only and never shipped.** With `THINKRAIL_SOURCEMAPS_RELEASE` set (a
-credentialed release build, [[module-ci-release]]), `vite.config.ts` emits hidden maps and the
-`sourceMapUpload.ts` plugin runs `posthog-cli sourcemap process --delete-after` on `dist`, failing if
-any `.map` remains; without it the build is unchanged. `posthogCli.ts` is the repo's only way to run
-posthog-cli (the root `posthog-cli` script exposes it to desktop's `preBuild`): it checks the binary against
-pinned SHA-256s before running it ([[module-ci-release]]). The injected chunk-id registry is what
-`transport` reads for UI error reports.
+**Release bundles do not emit or upload remote source maps.** Desktop staging refuses web `.map` files.
 
 **The React Compiler is on for every `apps/web` bundle** (`vite.config.ts`: `@rolldown/plugin-babel` running
 `@vitejs/plugin-react`'s `reactCompilerPreset()` over dev and build). Three devDependencies live in this
@@ -139,7 +133,7 @@ coverage of every file/diff renderer.
   `useScrollViewState`, Pierre diff/file's `useThreadAnnotations`, `PierreDiffSurface`, `PierreFileSurface`,
   image diff's `ImageContent`, `ImageView`, `PdfView`, `usePdfDocument`.
 - Manual memo dependencies cannot be preserved: `CsvDiff`, `JsonDiff`, `NotebookDiffSurface`, `PdfDiff`.
-- Other: `useLiveTabContent` (`??=`), `useAnalyticsConsent` (a callback that calls itself),
+- Other: `useLiveTabContent` (`??=`),
   `HistoryOverlay`'s `Highlight` (mutates a closure counter).
 
 A new bailout is a regression unless it joins this list.
@@ -349,7 +343,7 @@ themselves.
   cannot drift; the imports are generated from it. Vite emits the woff2 files
   into `dist/assets`, and `apps/cli` embeds them. No font CDN — the host is local and often
   offline, and an external `<link>` also put first paint behind a third party and contacted it on every
-  load despite the analytics opt-out. `e2e/fonts.spec.ts` pins both halves (no CDN request; the real
+  load without any remote telemetry. `e2e/fonts.spec.ts` pins both halves (no CDN request; the real
   faces present).
 - **The typography system — `typography.json` as the single source of truth, the primitives and the
   semantic styles generated from them, the `<body>` base, the 370/400/500/600/800 weight policy,

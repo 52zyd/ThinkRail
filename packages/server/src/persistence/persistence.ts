@@ -19,29 +19,17 @@ import {
 	type WireModel,
 	type Workspace,
 } from "@thinkrail/contracts";
-import {
-	claimBrowserAttributionAttemptIn,
-	readAcquisitionIn,
-	replaceAcquisitionWithTerminalMarkerIn,
-	saveAcquisitionIn,
-} from "./attribution";
-import { type AcquisitionRecord, isRecord } from "./attributionProtocol";
-import { claimAppInstalledIn, ensureInstallationIn, type InstallationRecord } from "./installation";
 
-export {
-	type AcquisitionRecord,
-	ATTRIBUTION_LIFETIME_MS,
-	ATTRIBUTION_MAX_POLLS,
-	ATTRIBUTION_ORIGIN,
-	ATTRIBUTION_POLL_INTERVAL_MS,
-	type AttributionTouch,
-	claimIdPattern,
-	hasExactKeys,
-	isRecord,
-	parseRedeemedAttribution,
-	type RedeemedAttribution,
-} from "./attributionProtocol";
-export type { InstallationRecord } from "./installation";
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function withoutTelemetry(value: object): Record<string, unknown> {
+	const result = { ...value };
+	for (const key of ["analyticsEnabled", "analyticsConsentConfirmed"])
+		Reflect.deleteProperty(result, key);
+	return result;
+}
 
 export function dataDir(): string {
 	return resolve(process.env.THINKRAIL_DATA_DIR ?? join(homedir(), ".thinkrail"));
@@ -336,7 +324,7 @@ export function loadConfig(): AppConfig {
 	const raw = readJson<unknown>("config.json", {});
 	if (!raw || typeof raw !== "object" || Array.isArray(raw)) return structuredClone(DEFAULT_CONFIG);
 	const value = raw as Record<string, unknown>;
-	const extensions = { ...value };
+	const extensions = withoutTelemetry(value);
 	delete extensions.chatMessageOrder;
 	delete extensions.layout;
 	delete extensions.themeMode;
@@ -344,11 +332,6 @@ export function loadConfig(): AppConfig {
 	return {
 		...extensions,
 		...normalizeThemePreference(value),
-		analyticsEnabled:
-			typeof value.analyticsEnabled === "boolean"
-				? value.analyticsEnabled
-				: DEFAULT_CONFIG.analyticsEnabled,
-		analyticsConsentConfirmed: value.analyticsConsentConfirmed === true,
 		notificationsEnabled:
 			typeof value.notificationsEnabled === "boolean"
 				? value.notificationsEnabled
@@ -411,29 +394,5 @@ export function loadConfig(): AppConfig {
 }
 
 export function saveConfig(config: AppConfig): void {
-	writeJson("config.json", config);
-}
-
-export function ensureInstallation(): InstallationRecord {
-	return ensureInstallationIn(dataDir());
-}
-
-export function claimAppInstalled(): boolean {
-	return claimAppInstalledIn(dataDir());
-}
-
-export function readAcquisition(now = Date.now()): AcquisitionRecord | undefined {
-	return readAcquisitionIn(dataDir(), now);
-}
-
-export function claimBrowserAttributionAttempt(): boolean {
-	return claimBrowserAttributionAttemptIn(dataDir());
-}
-
-export function saveAcquisition(record: AcquisitionRecord): void {
-	saveAcquisitionIn(dataDir(), record);
-}
-
-export function replaceAcquisitionWithTerminalMarker(): void {
-	replaceAcquisitionWithTerminalMarkerIn(dataDir());
+	writeJson("config.json", withoutTelemetry(config));
 }

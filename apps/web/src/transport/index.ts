@@ -1,8 +1,3 @@
-export {
-	clientErrorReport,
-	installClientErrorReporting,
-	reportClientError,
-} from "./errorReports";
 export { errorText } from "./errorText";
 export { requestMcpList, watchMcpWorkspace } from "./mcp";
 export { RequestError, wsErrorCode } from "./requestError";

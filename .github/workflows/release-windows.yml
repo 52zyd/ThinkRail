@@ -1,0 +1,113 @@
+name: Release Windows
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable version (X.Y.Z)
+        required: true
+        default: "0.1.0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-windows
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - name: Validate release version
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          [[ "$VERSION" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          [ "$GITHUB_REPOSITORY" = 52zyd/ThinkRail ]
+          [ "$GITHUB_REF" = refs/heads/main ]
+          git fetch --tags origin
+          ! git rev-parse --verify "refs/tags/v$VERSION"
+          versions=$(git tag -l | grep -E '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' || true)
+          [ "$(printf '%s\nv%s\n' "$versions" "$VERSION" | sort -V | tail -n 1)" = "v$VERSION" ]
+          gh api "repos/$GITHUB_REPOSITORY" > /dev/null
+          ! gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY"
+      - run: bun install --frozen-lockfile
+      - run: bun run check:deps
+      - run: bun run check:boundaries
+      - run: bun run check:seams
+      - run: bun run check:spec-surface
+      - run: bun run check:i18n
+      - run: bun run check:compiler
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run test
+      - run: bunx playwright install chromium
+      - run: bun run e2e
+      - id: native
+        uses: ./.github/actions/build-binary
+        with:
+          version: ${{ inputs.version }}
+          channel: stable
+          target: bun-windows-x64
+      - name: Collect verified artifacts
+        shell: pwsh
+        env:
+          CLI: ${{ steps.native.outputs.artifact-path }}
+          DESKTOP: ${{ steps.native.outputs.desktop-artifact-path }}
+          MANIFEST: ${{ steps.native.outputs.desktop-update-manifest-path }}
+          PAYLOAD: ${{ steps.native.outputs.desktop-update-archive-path }}
+        run: |
+          New-Item -ItemType Directory -Path release-out | Out-Null
+          foreach ($path in @($env:CLI, $env:DESKTOP, $env:MANIFEST, $env:PAYLOAD)) {
+            Copy-Item -LiteralPath $path -Destination release-out
+          }
+          $sums = Get-ChildItem -LiteralPath release-out -File | Sort-Object Name | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          }
+          $sums | Set-Content -LiteralPath release-out/SHA256SUMS -Encoding utf8NoBOM
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-release
+          path: release-out/
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-release
+          path: release-out
+      - name: Publish version and rolling desktop feed
+        working-directory: release-out
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ inputs.version }}
+          SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          sha256sum --check SHA256SUMS
+          gh release create "v$VERSION" thinkrail-windows-x64.exe thinkrail-desktop-windows-x64.zip SHA256SUMS \
+            --target "$SOURCE_SHA" --title "ThinkRail $VERSION (Windows x64)" --latest \
+            --notes "Unsigned community build. Extract the full desktop ZIP before running setup. Existing installations must be manually reinstalled once to migrate the update feed."
+          if ! gh release view desktop-updates; then
+            gh release create desktop-updates --target "$SOURCE_SHA" --title "Desktop Update Feed" --latest=false \
+              --notes "Rolling Electrobun stable Windows x64 update feed; use version releases for first installation."
+          fi
+          gh release edit desktop-updates --latest=false
+          gh release upload desktop-updates stable-win-x64-ThinkRail.tar.zst --clobber
+          gh release upload desktop-updates stable-win-x64-update.json --clobber

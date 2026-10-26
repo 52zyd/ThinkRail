@@ -30,8 +30,6 @@ const ACCEPTED_UPDATE_KEYS = {
 	theme: true,
 	themeMode: true,
 	systemThemePair: true,
-	analyticsEnabled: true,
-	analyticsConsentConfirmed: true,
 	notificationsEnabled: true,
 	terminalReplayKb: true,
 	terminalWindowsShell: true,
@@ -64,7 +62,11 @@ function assertUpdateShape(update: unknown): void {
 	if (typeof update !== "object" || update === null || Array.isArray(update)) {
 		throw new Error("settings update must be an object");
 	}
-	const unknownKey = Object.keys(update).find((key) => !Object.hasOwn(ACCEPTED_UPDATE_KEYS, key));
+	const unknownKey = Object.keys(update).find(
+		(key) =>
+			!Object.hasOwn(ACCEPTED_UPDATE_KEYS, key) &&
+			!["analyticsEnabled", "analyticsConsentConfirmed"].includes(key),
+	);
 	if (unknownKey !== undefined) throw new Error(`Unknown setting: ${unknownKey}`);
 }
 
@@ -122,6 +124,8 @@ export function updateConfig(partial: AppConfigUpdate): AppConfig {
 	const runtimeUpdate: RuntimeAppConfigUpdate = { ...partial };
 	delete runtimeUpdate.chatMessageOrder;
 	delete runtimeUpdate.layout;
+	Reflect.deleteProperty(runtimeUpdate, "analyticsEnabled");
+	Reflect.deleteProperty(runtimeUpdate, "analyticsConsentConfirmed");
 	for (const [name, value] of [
 		["chatLineWidth", runtimeUpdate.chatLineWidth],
 		["fileLineWidth", runtimeUpdate.fileLineWidth],
@@ -135,8 +139,6 @@ export function updateConfig(partial: AppConfigUpdate): AppConfig {
 	for (const [name, value] of [
 		["chatLineWidthBounded", runtimeUpdate.chatLineWidthBounded],
 		["fileLineWidthBounded", runtimeUpdate.fileLineWidthBounded],
-		["analyticsEnabled", runtimeUpdate.analyticsEnabled],
-		["analyticsConsentConfirmed", runtimeUpdate.analyticsConsentConfirmed],
 		["notificationsEnabled", runtimeUpdate.notificationsEnabled],
 		["reviewAutoFix", runtimeUpdate.reviewAutoFix],
 		["agentReviewEnabled", runtimeUpdate.agentReviewEnabled],
@@ -145,12 +147,7 @@ export function updateConfig(partial: AppConfigUpdate): AppConfig {
 			throw new Error(`${name} must be a boolean`);
 		}
 	}
-	if (
-		runtimeUpdate.analyticsConsentConfirmed !== undefined &&
-		runtimeUpdate.analyticsEnabled === undefined
-	) {
-		throw new Error("analytics consent must include the sharing preference");
-	}
+
 	const {
 		defaultModel,
 		defaultEffort,
@@ -230,14 +227,7 @@ export function updateConfig(partial: AppConfigUpdate): AppConfig {
 		throw new Error("systemThemePair must contain light and dark theme ids");
 	}
 	const current = getConfig();
-	if (
-		runtimeUpdate.analyticsEnabled === true &&
-		!current.analyticsEnabled &&
-		current.analyticsConsentConfirmed &&
-		runtimeUpdate.analyticsConsentConfirmed === undefined
-	) {
-		throw new Error("enabling additional analytics requires an explicit confirmation");
-	}
+
 	const nextThemeMode = themeMode ?? (theme !== undefined ? "fixed" : current.themeMode);
 	const nextSystemThemePair =
 		systemThemePair === undefined

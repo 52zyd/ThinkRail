@@ -467,7 +467,7 @@ re-read while a server starts. The state vocabulary and the attention/active pre
   push's `target`, which is how Providers and MCP settings each open only their own logins,
   **`clearLoginInput()`** drops the live input the instant a reply is sent (no double-submit),
   and **`clearLogin()`** dismisses it. The **settings surface** state — **`settingsOpen`** +
-  **`settingsSection`** (a const-object enum: `Providers`/`Models`/`Mcp`/`Github`/`Appearance`/`Chat`/`Layout`/`Updates`/`Terminal`/`Workspaces`/`Templates`/`Notifications`/`Privacy`/`Feedback`/`Extensions`;
+  **`settingsSection`** (a const-object enum: `Providers`/`Models`/`Mcp`/`Github`/`Appearance`/`Chat`/`Layout`/`Updates`/`Terminal`/`Workspaces`/`Templates`/`Notifications`/`Feedback`/`Extensions`;
   the `LineWidth` and `Review` keys are retained so old deep links still type-check but are not navigation
   sections — `panels/settingsNav` resolves them to an available section, and their controls now live in
   Chat/Appearance and Models) with **`openSettings(section?)`** (deep-links to a section, defaults to Providers) /
@@ -500,7 +500,6 @@ re-read while a server starts. The state vocabulary and the attention/active pre
   `fileLineWidthBounded`** switches, **`customLayoutPresets: LayoutPreset[]`**,
   optional **`defaultModel: WireModel` / `defaultEffort: ThinkingLevel`** for new chats, the picker's
   **`favoriteModels` / `recentModels: WireModel[]`** (defaulting to `[]` so a pre-v77 host reads as "none"),
-  **`analyticsEnabled: boolean`**, **`analyticsConsentConfirmed: boolean`**,
   **`notificationsEnabled: boolean`** (the attention-notification master toggle),
   **`subagentsEnabled: boolean`**, **`subagentMaxConcurrent: number`**, **`disabledExtensions: string[]`**
   (defaulting to `[]` so a pre-v82 host reads as "all on"), **`jbcentralQuotaEnabled: boolean`**,
@@ -508,11 +507,8 @@ re-read while a server starts. The state vocabulary and the attention/active pre
   defaulted/validated from the contracts helpers so an older or malformed host snapshot cannot poison
   the store). `terminalWindowsShell` narrows through `isTerminalWindowsShell` and otherwise uses
   `DEFAULT_CONFIG.terminalWindowsShell`; `TerminalSettings` consumes both terminal fields, while terminal
-  spawning remains server-owned — the Terminal, Line width, Chat, shared Layout catalog, Privacy, provider
-  controls, and shell quota read sides. Analytics preference and confirmation default independently to false;
-  the store never upgrades a preference to confirmation. A selector combines host capability, hydrated
-  configuration, and absent confirmation to drive the one first-launch prompt. Persisted preference priming
-  and final choice updates converge through `applyConfig`; the dialog's visual draft remains component-local.
+  spawning remains server-owned — the Terminal, Line width, Chat, shared Layout catalog, provider controls, and shell quota read sides. Retired privacy navigation
+  restores to Appearance; no analytics state or consent selector remains.
   **`chatMessageOrder: ChatMessageOrder`** and **`streamingResponseMovement:
   StreamingResponseMovement`** are instead client-local presentation preferences, hydrated together by
   the chat preference seam from host-qualified browser localStorage or the native shell's injected

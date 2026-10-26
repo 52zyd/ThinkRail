@@ -29,7 +29,7 @@ and process-boot logic lives in `packages/server`.
    there (cross-platform: `open` / `start` / `xdg-open`, best-effort), unless `--no-open`. Exit-only
    commands and redirected output omit the mark.
 5. SIGINT / SIGTERM await the shared idempotent `server.shutdown()` before exit; they do not duplicate
-   agent, analytics, or resource teardown.
+   agent or resource teardown.
 
 ## Interface
 
@@ -41,16 +41,14 @@ is a **subcommand** (`thinkrail update [--channel stable|nightly]
 entry needs it too: a subcommand never boots the host, so it must not pay for (or, in `uninstall`'s case,
 re-create) the staged asset cache. Otherwise the launch args: `--port` (stable default 24242,
 scans upward to the next free port on collision), `--host` (default `localhost`), `--no-open`,
-`--no-analytics` (**per-run suppression of additional analytics only** — basic events remain on;
-the durable additional-data choice is Settings → Privacy, see [[submodule-server-analytics]]),
+
 `--verbose` (debug-level logging — threaded to `bootHost` as `verbose: true`; the log files under
 `<dataDir>/logs` and their env switch `THINKRAIL_LOG_LEVEL` belong to `submodule-server-log`, whose
-module is that variable's single reader — same pattern as `THINKRAIL_NO_ANALYTICS`, so `dev.ts` honors
+module is that variable's single reader, so `dev.ts` honors
 it too),
 `-v`/`--version` (print the baked version and exit), `-h`/`--help`, and one positional `project-dir` (a
 git repo to open as a project on boot, best-effort). Env defaults: `THINKRAIL_PORT` / `THINKRAIL_HOST` /
-`THINKRAIL_STATIC_DIR` (flag > env > default). `THINKRAIL_NO_ANALYTICS` is documented in `--help` but
-deliberately **not** parsed here — the host's analytics module is its single reader (see below).
+`THINKRAIL_STATIC_DIR` (flag > env > default). Telemetry environment variables are no longer read.
 
 ## Update advisory
 
@@ -152,11 +150,9 @@ worktrees and any uncommitted work in them. pi's own state (`~/.pi`) is never to
 
 ## Version stamping (release seam)
 
-`@thinkrail/shared/version` exports `{ version, channel, commit, posthogProjectKey }` with a permanent
-from-source default (`0.0.0-dev`, empty key). The release pipeline overwrites that one module in the
-throwaway CI checkout before building CLI and desktop, so both report identical identity and only
-release builds carry an analytics key. `bootstrap.ts` prints the shared version for `--version`, passes
-it into `bootHost` for `server.welcome.appVersion`, and threads the key, channel, `build: "binary" | "source"`, and the per-run additional-data suppression into analytics. When normal opening is enabled it also supplies the existing `openBrowser` launcher callback for the packaged binary's one-shot attribution claim, opens the local UI first, then explicitly signals `server.startAttributionClaim()`. `--no-open` omits that capability and never signals readiness, so it does not consume an attempt. Source runs remain ineligible.
+`@thinkrail/shared/version` exports `{ version, channel, commit }`, defaulting to
+`0.0.0-dev` from source. Release builds stamp this file so both launchers and `server.welcome` agree.
+CLI opens only the local application URL; no remote attribution or telemetry options are passed.
 
 ## Launch entries + build provenance
 
@@ -168,22 +164,15 @@ provenance they declare, and each knows its own by construction rather than by i
 - `src/compiled-entry.ts` — the **compiled binary**'s entry (staging + pi registrations first):
   `launch("binary")`.
 
-`build` rides analytics as a plain property, so `channel = dev` runs are still separable into a locally
-compiled binary vs a source run (see `submodule-server-analytics`). Deliberately *not* sniffed from Bun's
-`/$bunfs/` module paths: that's an implementation detail a Bun bump can change, and it would mislabel
-silently. `src/args.ts` parses `--no-analytics` into `CliOptions.noAnalytics` but does **not** read
-`THINKRAIL_NO_ANALYTICS` — the host's analytics module is that variable's single reader, so every
-entrypoint honors it for additional data (including `packages/server/src/dev.ts`, which parses no argv).
-Neither spelling suppresses basic events; both help entries disclose that scope rather than promising
-zero analytics traffic. CI/test suppression remains host-owned and covers both tiers.
+`build` selects installed-binary update behavior rather than inferring it from runtime paths.
+The legacy `--no-analytics` flag is accepted as a no-op for existing scripts; it is no longer advertised.
 
 ## Single-file binary (`build:binary`)
 
 The binary embeds its source map (`--sourcemap`, ~+17 MB on top of the bytecode build; Bun's `--compile`
 embeds a map whenever it emits one, so no upload path avoids the size) so Bun resolves error stacks
 on-device, bytecode included; the build deletes the external `.map` it also writes, refuses to embed web
-`.map` files, and compiles from `BINARY_SOURCE_MAP_BASE` (`apps/cli`), which the launcher passes as
-analytics `remapBase` for binary builds because remapped frames are relative to that directory.
+`.map` files, and compiles from `BINARY_SOURCE_MAP_BASE` (`apps/cli`) for deterministic local stack locations.
 
 `bun run build:binary` produces a **standalone `thinkrail` executable** — one self-contained file per
 platform — via `bun build --compile`. Bun bundles the host *and* transparently embeds the `bun-pty` native

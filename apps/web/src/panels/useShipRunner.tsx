@@ -66,7 +66,6 @@ export interface ShipRunnerOptions {
 	openReview: OpenBranchReview | null;
 	review?: OpenBranchReview | null;
 	status: BranchFacts | null;
-	analyticsSource?: "plan_page";
 	noteOpenReview: (review: OpenBranchReview, url?: string) => void;
 	refresh: () => void;
 }
@@ -257,7 +256,6 @@ export function useShipRunner(options: ShipRunnerOptions): ShipRunner {
 					...(titleEdited ? { titleEdited: true } : {}),
 					...(body !== undefined ? { body } : {}),
 					...(draft ? { draft: true } : {}),
-					...(options.analyticsSource ? { source: options.analyticsSource } : {}),
 				},
 				{ timeoutMs: PR_OPEN_TIMEOUT_MS },
 			)

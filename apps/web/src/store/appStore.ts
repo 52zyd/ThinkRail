@@ -402,7 +402,6 @@ export const SettingsSection = {
 	Templates: "templates",
 	Review: "review",
 	Notifications: "notifications",
-	Privacy: "privacy",
 	Feedback: "feedback",
 	Extensions: "extensions",
 } as const;
@@ -1028,8 +1027,6 @@ interface AppState {
 	theme: ThemeId;
 	themeMode: ThemeMode;
 	systemThemePair: SystemThemePair | undefined;
-	analyticsEnabled: boolean;
-	analyticsConsentConfirmed: boolean;
 	notificationsEnabled: boolean;
 	subagentsEnabled: boolean;
 	subagentMaxConcurrent: number;
@@ -1379,14 +1376,6 @@ function configPatch(config: AppConfig) {
 	return {
 		...themePreference,
 		systemThemePair: themePreference.systemThemePair,
-		analyticsEnabled:
-			typeof config.analyticsEnabled === "boolean"
-				? config.analyticsEnabled
-				: DEFAULT_CONFIG.analyticsEnabled,
-		analyticsConsentConfirmed:
-			typeof config.analyticsConsentConfirmed === "boolean"
-				? config.analyticsConsentConfirmed
-				: DEFAULT_CONFIG.analyticsConsentConfirmed,
 		notificationsEnabled:
 			typeof config.notificationsEnabled === "boolean"
 				? config.notificationsEnabled
@@ -2265,8 +2254,6 @@ export const useAppStore = create<AppState>((set, get) => ({
 	theme: DEFAULT_CONFIG.theme,
 	themeMode: DEFAULT_CONFIG.themeMode,
 	systemThemePair: DEFAULT_CONFIG.systemThemePair,
-	analyticsEnabled: DEFAULT_CONFIG.analyticsEnabled,
-	analyticsConsentConfirmed: DEFAULT_CONFIG.analyticsConsentConfirmed,
 	notificationsEnabled: DEFAULT_CONFIG.notificationsEnabled,
 	subagentsEnabled: DEFAULT_CONFIG.subagentsEnabled,
 	subagentMaxConcurrent: DEFAULT_CONFIG.subagentMaxConcurrent,

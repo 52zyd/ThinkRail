@@ -375,7 +375,7 @@ credential-blind. Closed compatible-provider failure codes let clients render tr
   a bare ack, and its detached failure arrives on the additive `review.failed` push (`ReviewFailedPayload`)
   since the review has no chat to carry it. An older client reads the dropped fields as absent, so the pin
   is what lets a client tell "this host has no reviewer chat" from "this host is older" rather than inferring it;
-  **`AppConfig`** (`{ theme, themeMode, systemThemePair?, analyticsEnabled, analyticsConsentConfirmed, terminalReplayKb,
+  **`AppConfig`** (`{ theme, themeMode, systemThemePair?, terminalReplayKb,
   terminalWindowsShell, composerGrowthLimit, chatLineWidth, fileLineWidth, chatLineWidthBounded,
   fileLineWidthBounded, customLayoutPresets, defaultModel?, defaultEffort?, reviewModel?, reviewEffort?,
   favoriteModels, recentModels, reviewAutoFix, agentReviewEnabled, subagentsEnabled, subagentMaxConcurrent,
@@ -412,13 +412,7 @@ credential-blind. Closed compatible-provider failure codes let clients render tr
   unknown names are kept and ignored, and the host applies it to new and open sessions (see
   [[submodule-server-extensions]]); `customLayoutPresets` is the bounded
   resource-free catalog and is the **only** layout value synchronized by the host; current/default preset
-  and group limits are web-local); `analyticsEnabled` is the additional-data preference and host gate,
-  default `false`, while `analyticsConsentConfirmed` defaults `false` and records completion of the initial
-  choice. `ANALYTICS_CONSENT_PROTOCOL_VERSION` pins this v65 contract so newer clients do not show a consent
-  flow against older hosts that cannot persist it. The initial dialog first writes the enabled preference
-  alone, then completion and the current preference together; Privacy Settings writes both together. An older
-  client's preference-only write cannot create the new confirmation. The installation id remains entirely
-  server-side; basic events are not controlled by either flag, see [[submodule-server-analytics]]) carries
+  and group limits are web-local) carries
   it with the **`DEFAULT_CONFIG`** fallback (persisted host-side
   as `config.json`, delivered in
   `server.welcome`, mutated via `settings.update`). Every new user chat receives the resolved model and

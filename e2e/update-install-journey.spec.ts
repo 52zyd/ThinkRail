@@ -223,7 +223,7 @@ test("a successful install after relaunch toasts once and keeps Details from the
 	await expect(details).toContainText("ThinkRail 0.3.0-nightly.4 is installed");
 	await expect(details.getByRole("link", { name: "What's new" })).toHaveAttribute(
 		"href",
-		"https://github.com/JetBrains/thinkrail/releases/tag/v0.3.0-nightly.4",
+		"https://github.com/52zyd/ThinkRail/releases/tag/v0.3.0-nightly.4",
 	);
 	await expect(page.getByTestId("update-log")).toContainText(
 		"Installer ready; restarting ThinkRail",

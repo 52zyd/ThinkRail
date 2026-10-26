@@ -272,13 +272,11 @@ dependency. This keeps test process drivers outside both launchers and the serve
     point at the same mutable data directory, cross-process consistency is intentionally not guaranteed.
     Desktop artifacts are additive; native WebKitGTK on Ubuntu 24.04+/glibc 2.38 is
     the supported Linux floor. The standard framework CLI/configuration owns bundling and installers;
-    a documented pre-build hook prepares ThinkRail's physical resources and PI runtime. Release workflows
-    in `JetBrains/thinkrail-signing` consume the public build recipes and coordinate build → JetBrains
-    service signing → publication for an explicit public source commit. Product code and ordinary CI stay
-    public; credentials and publication stay private. macOS service signing consumes the framework's
-    expanded app archive and finalizes the DMG through the documented JetBrains SRE flow, without a local
-    Apple credential flow or mutation of Electrobun's compressed wrapper. Exact handoff and release
-    verification contracts belong to [[module-ci-release]]. Detail: [[module-desktop]], [[module-ci-release]].
+    a documented pre-build hook prepares ThinkRail's physical resources and PI runtime. This fork uses
+    a manual Windows x64 stable workflow in `52zyd/ThinkRail`: all conformance, browser and artifact
+    gates precede publication. Version releases and the non-latest `desktop-updates` feed remain separate.
+    No signing service is configured, so community builds are unsigned. The updater never falls back to
+    upstream. Exact handoff and verification belong to [[module-ci-release]]. Detail: [[module-desktop]].
 
 16. **Delegation is portable; ThinkRail is one embedder.** `packages/pi-delegation` owns the session
     fabric: one creation primitive with orthogonal axes, a run-owning handle, lineage, registry, and

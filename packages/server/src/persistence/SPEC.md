@@ -13,11 +13,8 @@ Durable host state—projects, workspaces, cross-frontend app config, terminal c
 
 ## Boundary
 
-- **Owns:** `dataDir()` (`THINKRAIL_DATA_DIR` for dev/e2e isolation, else `~/.thinkrail`, always resolved to an absolute path — a relative override would otherwise land managed worktrees in two places: `mkdirSync` resolves it against the host's cwd, `git -C <project>` against the project); project/workspace/config load-save operations and fieldwise validation over `DEFAULT_CONFIG` while preserving unknown top-level extension fields; versioned atomic `session-lifecycle.json` (latest observed settled completion + explicit-cancel run id), `session-receipts.json` (first-install baseline complete + session→handled completion id) and `turns.json` (per-workspace agent-run change sets, owned by `turns`); server-only `installation.json` (`{ id, appInstalled?: true }`) and campaign-only `attribution.json`. The non-rotating install UUID never crosses the wire.
-- **Public surface (barrel):** `dataDir`, project/workspace/config and terminal-catalog load-save operations, session receipt load-save operations, `ensureInstallation()` returning only `{ id }`, narrow install/browser claim operations, and strict acquisition read/save. Initial ID creation publishes a complete sibling temp via atomic no-overwrite hard link and rereads a concurrent winner; malformed existing records are preserved. An exclusive install-claim marker elects one packaged host across processes. The complete installation JSON is atomically replaced; caught replacement failures remove the marker and temp for retry, while a crash after claiming may consume the event without emission. Legacy installed records remain claimed.
-- **Browser attempt:** `attribution.json` exclusively creates its first `{ browserClaimAttempted: true }` marker with `wx`. Redeem atomically replaces it with strict first/last touch fields (bounded UTM values, referrer class, timestamp, and policy version); failed network or replacement work leaves the attempt terminal. Retention is 30 days after `last_touch`: expired or invalid records become terminal. The persisted schema rejects claim/verifier/challenge/URL, journey/bridge IDs, IP, and user agent. Other state has no cross-process lock.
-- **Allowed deps:** `contracts` (`Project`, `Workspace`, `AppConfig`, `LayoutPreset`, `DEFAULT_CONFIG`,
-  `isTerminalWindowsShell`); Node `fs`/`os`/`path`.
+- **Owns:** `dataDir()` (`THINKRAIL_DATA_DIR` for dev/e2e isolation, else `~/.thinkrail`, always resolved to an absolute path — a relative override would otherwise land managed worktrees in two places: `mkdirSync` resolves it against the host's cwd, `git -C <project>` against the project); project/workspace/config load-save operations and fieldwise validation over `DEFAULT_CONFIG` while preserving unknown top-level extension fields; versioned atomic `session-lifecycle.json` (latest observed settled completion + explicit-cancel run id), `session-receipts.json` (first-install baseline complete + session→handled completion id) and `turns.json` (per-workspace agent-run change sets, owned by `turns`); legacy installation/attribution files are left untouched and no longer read or written.
+- **Public surface (barrel):** `dataDir`, project/workspace/config, terminal-catalog, session receipt and turn load-save operations. No install identity or attribution API.
 - **Forbidden:** importing feature siblings or `host`; deriving session state; storing transcript content, cached running/input state, or local activation; combining lifecycle metadata with read receipts; persisting a current frame/view, selection/focus, or frontend-surface identity; reading alternate config keys or old schemas; or reading, rewriting, or deleting old host layout snapshots.
 
 Project and workspace loads return `Project.path` / `Workspace.worktreePath` in the host's resolved spelling
@@ -37,9 +34,7 @@ deliberate: a v0.2.0-nightly.16 host refused to start on a bad `session-receipts
 it. Write failures stay conservative: they may resurface or retain attention but never record unseen work as
 read.
 
-Analytics config preserves a saved boolean preference and a valid `analyticsConsentConfirmed` boolean
-independently; absent/malformed values default false. A preference-only write never implies completion.
-Settings owns initial preference priming and preference-plus-confirmation writes.
+Retired `analyticsEnabled` and `analyticsConsentConfirmed` fields are ignored on read and stripped on save, while unrelated extension fields survive.
 
 Config validation normalizes the closed theme mode plus complete opaque system pair, the closed
 composer-growth preference, the closed Windows terminal-shell preference (invalid/absent →

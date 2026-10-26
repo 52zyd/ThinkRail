@@ -8,7 +8,6 @@ import { useT } from "@thinkrail/locales/react";
 import { IconTooltip } from "@thinkrail/ui/tooltip";
 import { useEffect, useState } from "react";
 import { NotificationPermissionPrompt, useAttentionNotifications } from "../notifications";
-import { AnalyticsConsentDialog } from "../panels/AnalyticsConsentDialog";
 import { InterviewPromptDialog } from "../panels/InterviewPromptDialog";
 import { NewWorkspaceDialog } from "../panels/NewWorkspaceDialog";
 import { SettingsDialog } from "../panels/SettingsDialog";
@@ -17,7 +16,6 @@ import { useBranchStatus } from "../panels/useBranchStatus";
 import {
 	SettingsSection,
 	selectActiveWorkspace,
-	selectAnalyticsConsentPromptOpen,
 	selectContextProject,
 	useAppStore,
 } from "../store";
@@ -61,7 +59,6 @@ export function Shell() {
 	useLocalLayoutState();
 	useAttentionNotifications();
 	const status = useAppStore((s) => s.status);
-	const analyticsConsentOpen = useAppStore(selectAnalyticsConsentPromptOpen);
 	const StatusDot = status === "connected" ? RiCircleFill : Circle;
 	const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId);
 	const activeWorkspace = useAppStore(selectActiveWorkspace);
@@ -238,7 +235,7 @@ export function Shell() {
 			) : (
 				<ProjectHome projects={homeProjects} />
 			)}
-			{analyticsConsentOpen ? <AnalyticsConsentDialog /> : <InterviewPromptDialog />}
+			<InterviewPromptDialog />
 			<SessionSwitcher
 				open={sessionSwitcherOpen}
 				onOpenChange={(open) => {

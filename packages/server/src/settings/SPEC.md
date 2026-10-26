@@ -10,7 +10,7 @@ depends-on: [module-contracts]
 ## Responsibility
 
 The server-synchronized app config: opaque fixed-theme selection, fixed/system mode and optional light/dark
-pair, additional-analytics preference and first-run dialog completion marker, host-owned new-chat model and
+pair, host-owned new-chat model and
 effort defaults, terminal replay budget and Windows shell preference, chat composer growth preset, chat/file
 visual line widths plus independent pane bounds, bounded custom layout-preset catalog, JetBrains quota
 display/cadence, the host-wide subagent default, plan-review policy, the host-registry extensions the
@@ -75,9 +75,7 @@ interval (`1–3600`, default 30), because those values govern host process cade
 - **An accepted key is value-checked before it reaches the merge; only the effort levels are trusted.** `terminalReplayKb` must be a finite number (its range stays with `terminal`, which clamps on read), `composerGrowthLimit` one of the closed growth presets, and `defaultModel` / `reviewModel` `null` or model-shaped like a `favoriteModels` entry, alongside the typed checks the other fields already have. A malformed value rejects the whole update before cache, persistence, or broadcast changes, exactly like an unknown key. `defaultEffort` / `reviewEffort` carry pi's `ThinkingLevel`, for which `contracts` has no runtime list, so they pass on the wire type alone and the new-chat resolver clamps an unknown level through pi; adding a level list to `contracts` is the way to close that, not a settings-local copy.
 - Custom layout presets are a complete top-level catalog replacement, not a nested per-item patch. Each value is bounded, resource-free, uniquely identified, uses only the current preset schema, and contains no workspace/tab/session/terminal identity. A malformed persisted member is isolated during config validation; a wire mutation with any malformed member is rejected as a whole. No alternate config key or old preset schema is read or upgraded.
 - Deleting or editing a custom preset changes only the shared definition. It cannot mutate any frontend's instantiated frame or local default selection.
-- Analytics preference and first-run dialog completion are validated booleans. The dialog may persist the
-  default-on preference alone; a preference-only write never infers completion. Confirmation without a
-  preference is rejected, and changing a confirmed decision writes both fields. The delivery gate belongs to
-  [[submodule-server-analytics]]; the dialog lifecycle belongs to [[submodule-web-panels]].
+- Retired `analyticsEnabled` and `analyticsConsentConfirmed` updates are ignored; their stored values
+  are removed on the next save without dropping unrelated extension preferences.
 - `null` clears optional `defaultModel`/`defaultEffort` and `reviewModel`/`reviewEffort` overrides; it is a wire-only sentinel and never persists.
 - Stored `favoriteModels` / `recentModels` that are not arrays fall back to `[]` on load without discarding valid siblings; a wire `favoriteModels` with any non-model member rejects the whole update.

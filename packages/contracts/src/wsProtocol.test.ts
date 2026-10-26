@@ -10,7 +10,6 @@ import {
 } from "./domain";
 import {
 	AGENT_REVIEW_SETTING_PROTOCOL_VERSION,
-	ANALYTICS_CONSENT_PROTOCOL_VERSION,
 	BRANCH_STATUS_PROTOCOL_VERSION,
 	CHANGE_MUTATIONS_PROTOCOL_VERSION,
 	CHAT_RESOURCES_PROTOCOL_VERSION,
@@ -90,11 +89,6 @@ test("host update execution advances the additive lifecycle protocol", () => {
 	expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(HOST_UPDATE_RUN_PROTOCOL_VERSION);
 	expect(WS_CHANNELS.hostUpdateAvailable).toBe("host.updateAvailable");
 	expect(WS_METHODS.hostUpdate).toBe("host.update");
-});
-
-test("explicit analytics consent is available from protocol v65", () => {
-	expect(ANALYTICS_CONSENT_PROTOCOL_VERSION).toBe(65);
-	expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(ANALYTICS_CONSENT_PROTOCOL_VERSION);
 });
 
 test("session rename is versioned and bounded", () => {
@@ -224,7 +218,7 @@ test("client error reports are pinned to v90", () => {
 });
 
 test("compatible provider management advances the protocol", () => {
-	expect(PROTOCOL_VERSION).toBe(91);
+	expect(PROTOCOL_VERSION).toBeGreaterThanOrEqual(COMPATIBLE_PROVIDERS_PROTOCOL_VERSION);
 	expect(COMPATIBLE_PROVIDERS_PROTOCOL_VERSION).toBe(91);
 	expect(WS_METHODS.providerCompatibleList).toBe("provider.compatibleList");
 	expect(WS_METHODS.providerCompatibleSave).toBe("provider.compatibleSave");

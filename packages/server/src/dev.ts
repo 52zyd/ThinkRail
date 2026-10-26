@@ -100,6 +100,5 @@ const { port } = await bootHost({
 	portMode: envPort ? "exact" : "free",
 	resolveShellEnv: true,
 	...(staticDir ? { staticDir } : {}),
-	analytics: { channel: "dev", build: "source" },
 });
 console.log(`thinkrail host: http://${host}:${port}`);

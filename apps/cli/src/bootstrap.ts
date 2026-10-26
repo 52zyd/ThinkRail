@@ -3,15 +3,12 @@ import { resolve } from "node:path";
 import { type BuildKind, bootHost } from "@thinkrail/server";
 import { spawnDetached } from "@thinkrail/shared/spawn";
 import { printStartupMark } from "@thinkrail/shared/startupMark";
-import { channel, posthogProjectKey, version } from "@thinkrail/shared/version";
+import { channel, version } from "@thinkrail/shared/version";
 import { type CliOptions, parseArgs, parseSubcommand, USAGE } from "./args";
-import { openUiThenStartAttribution } from "./attributionReadiness";
-import { BINARY_SOURCE_MAP_BASE } from "./binarySourceMap";
 import { runUninstall } from "./uninstall";
 import { createCliHostUpdate, runUpdate } from "./update";
 
 const DEFAULT_STATIC_DIR = resolve(import.meta.dir, "../../web/dist");
-
 function openBrowser(url: string): void {
 	const command =
 		process.platform === "darwin"
@@ -21,7 +18,6 @@ function openBrowser(url: string): void {
 				: ["xdg-open", url];
 	spawnDetached(command);
 }
-
 async function bootstrap(build: BuildKind): Promise<void> {
 	const argv = Bun.argv.slice(2);
 	const subcommand = parseSubcommand(argv);
@@ -32,7 +28,6 @@ async function bootstrap(build: BuildKind): Promise<void> {
 				: await runUninstall(argv.slice(1), process.env);
 		process.exit(exitCode);
 	}
-
 	let options: CliOptions;
 	try {
 		options = parseArgs(argv, process.env);
@@ -41,27 +36,23 @@ async function bootstrap(build: BuildKind): Promise<void> {
 		console.error(`\n${USAGE}`);
 		process.exit(1);
 	}
-
 	if (options.help) {
 		console.log(USAGE);
 		return;
 	}
-
 	if (options.version) {
 		console.log(version);
 		return;
 	}
-
 	const staticDir = options.staticDir ?? DEFAULT_STATIC_DIR;
 	if (!existsSync(staticDir)) {
 		console.warn(`Web app not found at ${staticDir} — run \`bun run build:web\` to build the UI.`);
 	}
-
 	const hostUpdate = createCliHostUpdate(build, channel, version, {
 		platform: process.platform,
 		execPath: process.execPath,
 	});
-	const { server, port, requested } = await bootHost({
+	const { port, requested } = await bootHost({
 		port: options.port,
 		host: options.host,
 		portMode: "free",
@@ -69,28 +60,18 @@ async function bootstrap(build: BuildKind): Promise<void> {
 		staticDir,
 		appVersion: version,
 		...(options.verbose ? { verbose: true } : {}),
-		analytics: {
-			posthogApiKey: posthogProjectKey,
-			channel,
-			build,
-			...(build === "binary" ? { remapBase: BINARY_SOURCE_MAP_BASE } : {}),
-			mute: options.noAnalytics,
-			...(options.open ? { openExternal: openBrowser } : {}),
-		},
 		...(hostUpdate ? { hostUpdate } : {}),
 		...(options.projectDir ? { projectPath: resolve(process.cwd(), options.projectDir) } : {}),
 	});
 	if (port !== requested) {
 		console.warn(`Port ${requested} is in use; using free port ${port}.`);
 	}
-
 	const openHost = options.host === "0.0.0.0" || options.host === "::" ? "localhost" : options.host;
 	const url = `http://${openHost}:${port}`;
 	printStartupMark({ status: "host ready", endpoint: url });
 	console.log(`thinkrail → ${url}`);
-	openUiThenStartAttribution(options.open, url, openBrowser, server.startAttributionClaim);
+	if (options.open) openBrowser(url);
 }
-
 export async function launch(build: BuildKind): Promise<void> {
 	try {
 		await bootstrap(build);

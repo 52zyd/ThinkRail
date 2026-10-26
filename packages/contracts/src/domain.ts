@@ -936,8 +936,6 @@ export function isLineWidth(value: unknown): value is number {
 }
 
 export interface AppConfig extends ThemePreference {
-	analyticsEnabled: boolean;
-	analyticsConsentConfirmed: boolean;
 	/** When true, the client may raise out-of-app attention notifications (still gated by browser permission). */
 	notificationsEnabled: boolean;
 	terminalReplayKb: number;
@@ -1095,8 +1093,6 @@ export function isJbcentralQuotaRefreshSeconds(value: unknown): value is number 
 export const DEFAULT_CONFIG: AppConfig = {
 	theme: "dark",
 	themeMode: "fixed",
-	analyticsEnabled: false,
-	analyticsConsentConfirmed: false,
 	notificationsEnabled: true,
 	terminalReplayKb: TERMINAL_REPLAY_KB.default,
 	terminalWindowsShell: "auto",

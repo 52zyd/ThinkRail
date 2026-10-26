@@ -22,7 +22,7 @@ bug reports, include:
 Node.js ≥ 22.19 (required by the in-process `pi` engine), and an authenticated `pi` provider for agent work.
 
 ```bash
-git clone https://github.com/dafeiyupp/ThinkRail.git
+git clone https://github.com/52zyd/ThinkRail.git
 cd ThinkRail
 bun install --frozen-lockfile
 bun run dev
@@ -128,6 +128,9 @@ it. See [`AGENTS.md`](AGENTS.md) for the spec workflow.
 
 ## Translations
 
+This fork defaults new or missing language preferences to `zh-CN`; explicit saved preferences are kept.
+Tests that assert English UI copy must select English explicitly rather than depend on the machine's locale.
+
 ThinkRail's interface strings live in one file,
 [`packages/locales/en.json`](packages/locales/en.json): a flat JSON object of named keys
 (`"settings.language.title": "Language"`). A translation is the same file with the values translated.
@@ -153,6 +156,24 @@ be partial; `bun run test` checks it against `en.json` (keys, placeholders, mark
 replies, tool output, skills, and prompts are not part of the interface and are not translated.
 
 ## Submitting changes
+
+### Windows Community Release
+
+Use this repository's **Actions → Release Windows → Run workflow** from `main`, with a new stable
+`X.Y.Z` version (the first is `0.1.0`). The workflow installs the lockfile, runs all fast, unit and no-agent
+browser gates, then verifies the CLI, expanded desktop and installer on a disposable hosted Windows runner.
+Failed gates prevent publication. Never run Windows installer smoke on a personal workstation: it writes
+real Windows shortcuts and uninstall registration outside an isolated home directory.
+
+The immutable version release contains the standalone CLI, desktop ZIP and checksums. The separate
+`desktop-updates` release is never latest; its official archive uploads before its manifest. Updates and
+installation scripts use `52zyd/ThinkRail`, with no upstream fallback. These builds are unsigned; neither
+checksums nor a successful build certify a publisher. Old desktop installations require one manual
+reinstall of the new full ZIP to migrate the baked-in update feed.
+
+When refreshing `bytools/`, replace the setup EXE, both adjacent `.installer` files and the full ZIP together,
+then regenerate `SHA256SUMS` from final bytes, including the accompanying `README.txt`. Retain maintained
+test sources and fixtures; do not commit local test runs, debug scripts, caches, logs, credentials or reports.
 
 1. [Fork the repository](https://docs.github.com/articles/fork-a-repo) and create a
    branch off `main`.

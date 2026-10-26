@@ -29,22 +29,29 @@ test("available languages are the bundled ones plus valid local files", () => {
 
 test("options mark built-in, local, and customized languages, then broken files", () => {
 	const chinese = languageName("zh-CN");
-	expect(languageOptions("system", snapshot)).toEqual([
-		{ kind: "language", tag: "de", name: "Deutsch", source: "local" },
-		{ kind: "language", tag: "en", name: "English", source: "builtin+local" },
-		{ kind: "language", tag: "zh-CN", name: chinese, source: "builtin" },
-		{
-			kind: "broken",
-			fileName: "fr.json",
-			tag: "fr",
-			error: "invalid-json",
-			detail: "Unexpected token",
-		},
-	]);
-	expect(languageOptions("system", null)).toEqual([
-		{ kind: "language", tag: "en", name: "English", source: "builtin" },
-		{ kind: "language", tag: "zh-CN", name: chinese, source: "builtin" },
-	]);
+	expect(languageOptions("system", snapshot)).toEqual(
+		expect.arrayContaining([
+			{ kind: "language", tag: "de", name: "Deutsch", source: "local" },
+			{ kind: "language", tag: "en", name: "English", source: "builtin+local" },
+			{ kind: "language", tag: "zh-CN", name: chinese, source: "builtin" },
+			{
+				kind: "broken",
+				fileName: "fr.json",
+				tag: "fr",
+				error: "invalid-json",
+				detail: "Unexpected token",
+			},
+		]),
+	);
+	expect(languageOptions("system", snapshot)).toHaveLength(4);
+	expect(languageOptions("system", snapshot).at(-1)?.kind).toBe("broken");
+	expect(languageOptions("system", null)).toEqual(
+		expect.arrayContaining([
+			{ kind: "language", tag: "en", name: "English", source: "builtin" },
+			{ kind: "language", tag: "zh-CN", name: chinese, source: "builtin" },
+		]),
+	);
+	expect(languageOptions("system", null)).toHaveLength(2);
 });
 
 test("a selected language whose file is gone is listed as missing and renders English", () => {

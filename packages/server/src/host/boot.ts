@@ -1,11 +1,9 @@
 import { findFreePort } from "@thinkrail/shared/freePort";
 import { resolveShellEnv } from "@thinkrail/shared/shellEnv";
-import { reportError } from "../analytics";
 import { initializeJbcentralRuntime } from "../auth";
 import { initLogging, logger } from "../log";
 import { installCrashLog } from "./crashLog";
 import { type CreateServerOptions, createServer, type RunningServer } from "./server";
-
 export interface BootHostOptions {
 	port: number;
 	host: string;
@@ -13,20 +11,16 @@ export interface BootHostOptions {
 	staticDir?: string;
 	projectPath?: string;
 	appVersion?: string;
-	analytics?: CreateServerOptions["analytics"];
 	hostUpdate?: CreateServerOptions["hostUpdate"];
 	verbose?: boolean;
 	resolveShellEnv?: boolean;
 }
-
 const log = logger("host");
-
 export interface BootedHost {
 	readonly server: RunningServer;
 	readonly port: number;
 	readonly requested: number;
 }
-
 function attachProcessSignals(server: RunningServer): RunningServer {
 	let signalExit = false;
 	const detachSignals = () => {
@@ -52,12 +46,10 @@ function attachProcessSignals(server: RunningServer): RunningServer {
 		get port() {
 			return server.port;
 		},
-		startAttributionClaim: () => server.startAttributionClaim(),
 		stop,
 		shutdown,
 	};
 }
-
 export async function bootHost(options: BootHostOptions): Promise<BootedHost> {
 	const shellEnv = options.resolveShellEnv ? resolveShellEnv() : undefined;
 	await initLogging({
@@ -67,7 +59,6 @@ export async function bootHost(options: BootHostOptions): Promise<BootedHost> {
 	installCrashLog(options.appVersion);
 	await shellEnv;
 	await initializeJbcentralRuntime();
-
 	const requested = options.port;
 	const port =
 		options.portMode === "free" ? await findFreePort(requested, options.host) : requested;
@@ -77,14 +68,9 @@ export async function bootHost(options: BootHostOptions): Promise<BootedHost> {
 		...(options.staticDir ? { staticDir: options.staticDir } : {}),
 		...(options.projectPath ? { projectPath: options.projectPath } : {}),
 		...(options.appVersion ? { appVersion: options.appVersion } : {}),
-		...(options.analytics ? { analytics: options.analytics } : {}),
 		...(options.hostUpdate ? { hostUpdate: options.hostUpdate } : {}),
 	});
 	const server = attachProcessSignals(running);
 	log.info(`listening on port ${server.port}`);
 	return { server, port: server.port, requested };
-}
-
-export function reportDesktopError(error: unknown, scope: string): void {
-	reportError(error, { source: "desktop", handled: true, scope });
 }

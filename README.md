@@ -31,7 +31,7 @@
 本机仓库中的 `bytools/ThinkRail-Setup.exe` 也可直接启动安装，前提是配套载荷保持在原位置。
 分发时发送完整 ZIP，不要单独发送 EXE。
 
-安装包约 **53.34 MiB**，内部版本仍为 `0.0.0-dev`，**未签名**。Windows 可能显示发布者未知或
+社区安装包**未签名**。Windows 可能显示发布者未知或
 SmartScreen 警告，请核实来源后自行决定是否运行，不需要关闭系统安全防护。
 [`bytools/SHA256SUMS`](bytools/SHA256SUMS) 用于检查完整性，不代替代码签名或来源认证：
 
@@ -41,11 +41,13 @@ Get-FileHash .\thinkrail-desktop-windows-x64.zip -Algorithm SHA256
 
 将输出与 `SHA256SUMS` 中对应文件的值比较。完整说明和安装包验证边界见
 [`bytools/README.txt`](bytools/README.txt)。尚未在全新 Windows 系统上验证安装与卸载；
-原生窗口完整冒烟检查在最大化步骤超时，不能将宿主启动成功视为所有窗口交互通过。
+展开载荷的原生窗口和共享宿主冒烟已通过，但完整单元与浏览器套件仍存在失败，不能视为正式发行验收通过。
 
-**更新提示**：当前桌面包保留上游官方更新地址。若要保留本仓库的定制功能，不要安装官方更新；
-更新此仓库源码后重新打包。上游的安装脚本与发行包也不包含这里的定制改动。
-macOS 和 Linux 用户可自行构建，或选择[上游发行版](https://github.com/JetBrains/thinkrail/releases)，但两者不是同一分发版本。
+**更新来源**：本版本的桌面更新与 CLI 安装脚本仅使用
+[`52zyd/ThinkRail`](https://github.com/52zyd/ThinkRail/releases)，不回退上游。
+首次正式 Windows 发布版本为 `0.1.0`，通过仓库的手动发布工作流构建和验证。
+旧安装包仍内嵌上游更新地址，必须手动重装本仓库的新完整 ZIP 后才能迁移；个人数据不会自动删除。
+macOS 和 Linux 可从源码自行构建；本仓库不宣称提供这些平台的已验证签名包。
 
 ## 接入 OpenAI 兼容服务
 
@@ -94,7 +96,7 @@ macOS 和 Linux 用户可自行构建，或选择[上游发行版](https://githu
 依赖版本按仓库锁定，不需要顺带升级 pi 或其他依赖。
 
 ```bash
-git clone https://github.com/dafeiyupp/ThinkRail.git
+git clone https://github.com/52zyd/ThinkRail.git
 cd ThinkRail
 bun install --frozen-lockfile
 bun run dev
@@ -136,11 +138,10 @@ ThinkRail 是薄宿主，pi 在进程内运行并管理模型、技能、压缩�
 
 ## 隐私与凭据
 
-原项目包含使用分析与错误分类上报机制。使用分析不包含提示词、代码、文件或凭据；
-错误上报只允许分类信息和 ThinkRail 自身栈帧，不包含错误消息或项目内容。
-“共享额外使用数据”在设置中的隐私页控制额外共享；CLI 的 `--no-analytics` 或
-`THINKRAIL_NO_ANALYTICS=1` 也只关闭额外共享，不应理解为关闭所有上报。
-具体规则见 [`packages/server/src/analytics/SPEC.md`](packages/server/src/analytics/SPEC.md)。
+此二开版本不发送应用使用统计、错误报告或浏览器来源归因，不再提供隐私分析开关与同意弹窗。
+本地日志、崩溃记录和界面错误恢复保留。旧分析设置读取时忽略，并在下次保存配置时移除；
+已有历史文件不会被批量清理。应用仍需要访问你主动配置的模型服务、MCP 服务和本仓库更新源。
+这不意味着离线运行，也不限制用户自行安装的第三方扩展所发起的网络请求。
 不要将 API Key、个人配置或包含敏感内容的本机日志提交到 Git。
 
 ## 许可证

@@ -16,6 +16,10 @@ import { join, resolve } from "node:path";
 const repositoryRoot = resolve(import.meta.dir, "../../..");
 const shellInstaller = join(repositoryRoot, "install.sh");
 const powershellInstaller = join(repositoryRoot, "install.ps1");
+const bash =
+	process.platform === "win32"
+		? resolve(Bun.which("git") ?? "git", "..", "..", "bin", "bash.exe")
+		: "bash";
 const roots: string[] = [];
 const binaryBody = "controlled thinkrail artifact\n";
 const binaryHash = createHash("sha256").update(binaryBody).digest("hex");
@@ -136,7 +140,7 @@ function runInstaller(
 	const assetName = overrides.FAKE_ASSET_NAME ?? "thinkrail-linux-x64";
 	const child = Bun.spawnSync(
 		[
-			"bash",
+			bash,
 			"-c",
 			'export PATH="$1:$PATH"; shift; exec bash "$@"',
 			"installer-test",

@@ -2734,7 +2734,6 @@ test("installWelcomeSnapshot lands one complete snapshot and advances its own ge
 
 	useAppStore.getState().installWelcomeSnapshot(44, [p1, closed], [p1, closed], {
 		theme: "test-theme",
-		analyticsEnabled: false,
 		terminalReplayKb: 256,
 	});
 	unsubscribe();

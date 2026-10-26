@@ -12,7 +12,6 @@ import {
 	RiPaletteLine,
 	RiPlugLine,
 	RiPuzzle2Line,
-	RiShieldCheckLine,
 	RiTerminalBoxLine,
 	RiTranslate2,
 } from "@remixicon/react";
@@ -95,7 +94,6 @@ const NAV_GROUPS: SettingsNavGroup[] = [
 				label: "settings.nav.notifications",
 				icon: RiNotification3Line,
 			},
-			{ id: SettingsSection.Privacy, label: "settings.nav.privacy", icon: RiShieldCheckLine },
 			{
 				id: SettingsSection.Updates,
 				label: "settings.nav.updates",

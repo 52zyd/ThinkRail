@@ -3,7 +3,6 @@ import { join } from "node:path";
 import type { FullConfig } from "@playwright/test";
 import { removeTree } from "@thinkrail/shared/removeTree";
 import { seedAgentDefinitionFixtures } from "./fixtures/agents";
-import { CONFIRMED_ANALYTICS_CONFIG, seedAnalyticsConsent } from "./fixtures/analyticsConsent";
 import {
 	CentralSetupError,
 	findGlobalCentralArtifact,
@@ -31,6 +30,7 @@ import {
 } from "./fixtures/paths";
 import { seedFixtureRepo } from "./fixtures/repo";
 import { seedExternalCwdSessions } from "./fixtures/sessions";
+import { ENGLISH_CONFIG, seedEnglishConfig } from "./fixtures/settingsConfig";
 import { seedTemplateFixtures } from "./fixtures/templates";
 import { E2eWire } from "./fixtures/wire";
 
@@ -57,7 +57,7 @@ export default function globalSetup(config?: FullConfig): void | Promise<void> {
 		const globalCentralArtifact = centralMode ? findGlobalCentralArtifact() : undefined;
 		rmSync(E2E_DATA_DIR, { recursive: true, force: true });
 		mkdirSync(E2E_DATA_DIR, { recursive: true });
-		writeFileSync(join(E2E_DATA_DIR, "config.json"), JSON.stringify(CONFIRMED_ANALYTICS_CONFIG));
+		writeFileSync(join(E2E_DATA_DIR, "config.json"), JSON.stringify(ENGLISH_CONFIG));
 		writeFileSync(
 			join(E2E_DATA_DIR, "feedback.json"),
 			JSON.stringify({ acceptedMessages: 0, nextInvitationAt: 10, dismissed: true }),
@@ -116,13 +116,13 @@ export default function globalSetup(config?: FullConfig): void | Promise<void> {
 					wire.close();
 				}
 			})
-			.then(() => seedAnalyticsConsent(baseURL, false, true))
+			.then(() => seedEnglishConfig(baseURL))
 			.then(() => undefined);
 	}
 	return E2eWire.connect()
 		.then(async (wire) => {
 			try {
-				await wire.request("settings.update", { config: CONFIRMED_ANALYTICS_CONFIG });
+				await wire.request("settings.update", { config: ENGLISH_CONFIG });
 				await waitForCentralTarget(wire);
 				removeCentralModeLocalSeeds();
 			} finally {

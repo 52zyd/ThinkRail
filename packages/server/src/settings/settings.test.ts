@@ -59,90 +59,39 @@ test("getConfig falls back to DEFAULT_CONFIG when no config.json exists", () => 
 	expect(getConfig()).toEqual(DEFAULT_CONFIG);
 });
 
-test.each([
-	true,
-	false,
-])("legacy analytics preference %s seeds selection without consent", (enabled) => {
-	writeFileSync(join(dataDir, "config.json"), JSON.stringify({ analyticsEnabled: enabled }));
-	expect(getConfig()).toMatchObject({
-		analyticsEnabled: enabled,
-		analyticsConsentConfirmed: false,
-	});
-	updateConfig({ theme: "light" });
-	resetConfigCache();
-	expect(getConfig()).toMatchObject({
-		analyticsEnabled: enabled,
-		analyticsConsentConfirmed: false,
-	});
-});
-
-test("new and malformed analytics config defaults off and unconfirmed", () => {
-	expect(getConfig()).toMatchObject({ analyticsEnabled: false, analyticsConsentConfirmed: false });
+test("legacy telemetry keys are ignored on read and update, and stripped on save", () => {
 	writeFileSync(
 		join(dataDir, "config.json"),
-		JSON.stringify({ analyticsEnabled: "yes", analyticsConsentConfirmed: "true" }),
+		JSON.stringify({
+			analyticsEnabled: true,
+			analyticsConsentConfirmed: true,
+			locale: "en",
+			extensionPreference: "keep",
+		}),
 	);
-	resetConfigCache();
-	expect(getConfig()).toMatchObject({ analyticsEnabled: false, analyticsConsentConfirmed: false });
-});
-
-test.each([
-	true,
-	false,
-])("explicit analytics choice %s persists and broadcasts atomically", (enabled) => {
+	expect(getConfig()).not.toHaveProperty("analyticsEnabled");
+	expect(getConfig()).not.toHaveProperty("analyticsConsentConfirmed");
+	const legacy: AppConfigUpdate = { theme: "light" };
+	Reflect.set(legacy, "analyticsEnabled", "yes");
+	Reflect.set(legacy, "analyticsConsentConfirmed", true);
 	const published: AppConfig[] = [];
 	setSettingsPublisher((config) => published.push(config));
-	updateConfig({ analyticsEnabled: enabled, analyticsConsentConfirmed: true });
+	updateConfig(legacy);
+	const saved = JSON.parse(readFileSync(join(dataDir, "config.json"), "utf8"));
+	expect(saved).not.toHaveProperty("analyticsEnabled");
+	expect(saved).not.toHaveProperty("analyticsConsentConfirmed");
+	expect(saved).toMatchObject({ locale: "en", extensionPreference: "keep", theme: "light" });
 	expect(published).toHaveLength(1);
-	expect(published[0]).toMatchObject({
-		analyticsEnabled: enabled,
-		analyticsConsentConfirmed: true,
-	});
 	resetConfigCache();
-	expect(getConfig()).toMatchObject({ analyticsEnabled: enabled, analyticsConsentConfirmed: true });
+	expect(getConfig().locale).toBe("en");
 });
 
-test("preference-only updates cannot infer expanded consent", () => {
-	updateConfig({ analyticsEnabled: true });
-	expect(getConfig()).toMatchObject({ analyticsEnabled: true, analyticsConsentConfirmed: false });
-});
-
-test("a legacy preference-only write cannot re-enable additional data after a declined decision", () => {
-	updateConfig({ analyticsEnabled: false, analyticsConsentConfirmed: true });
-	expect(() => updateConfig({ analyticsEnabled: true })).toThrow("explicit confirmation");
-	expect(getConfig()).toMatchObject({ analyticsEnabled: false, analyticsConsentConfirmed: true });
-	updateConfig({ analyticsEnabled: true, analyticsConsentConfirmed: true });
-	updateConfig({ analyticsEnabled: false });
-	expect(() => updateConfig({ analyticsEnabled: true })).toThrow("explicit confirmation");
-});
-
-test("invalid or incomplete consent updates leave disk, cache and broadcasts unchanged", () => {
-	updateConfig({ analyticsEnabled: false, analyticsConsentConfirmed: false });
-	const before = readFileSync(join(dataDir, "config.json"), "utf8");
-	const published: AppConfig[] = [];
-	setSettingsPublisher((config) => published.push(config));
-	const invalidPreference: AppConfigUpdate = { theme: "light" };
-	Reflect.set(invalidPreference, "analyticsEnabled", "yes");
-	const invalidConfirmation: AppConfigUpdate = { analyticsEnabled: true };
-	Reflect.set(invalidConfirmation, "analyticsConsentConfirmed", "yes");
-	for (const update of [
-		invalidPreference,
-		invalidConfirmation,
-		{ analyticsConsentConfirmed: true },
-	]) {
-		expect(() => updateConfig(update)).toThrow();
-	}
-	expect(readFileSync(join(dataDir, "config.json"), "utf8")).toBe(before);
-	expect(getConfig()).toMatchObject({ analyticsEnabled: false, analyticsConsentConfirmed: false });
-	expect(published).toEqual([]);
-});
-
-test("failed consent persistence never updates the cached choice or publishes it", () => {
+test("failed settings persistence never updates the cache or publishes", () => {
 	const current = getConfig();
 	mkdirSync(join(dataDir, "config.json"));
 	const published: AppConfig[] = [];
 	setSettingsPublisher((config) => published.push(config));
-	expect(() => updateConfig({ analyticsEnabled: true, analyticsConsentConfirmed: true })).toThrow();
+	expect(() => updateConfig({ locale: "en" })).toThrow();
 	expect(getConfig()).toBe(current);
 	expect(published).toEqual([]);
 });
@@ -865,11 +814,11 @@ test("the settle idle window defaults to 7 days, accepts null for never, and rej
 	expect(getConfig().settleIdleDays).toBeNull();
 });
 
-test("locale defaults to system, keeps an unavailable tag, and rejects non-canonical values", () => {
-	expect(DEFAULT_CONFIG.locale).toBe("system");
+test("locale defaults to Chinese, keeps an unavailable tag, and rejects non-canonical values", () => {
+	expect(DEFAULT_CONFIG.locale).toBe("zh-CN");
 	writeFileSync(join(dataDir, "config.json"), JSON.stringify({ locale: 42 }));
 	resetConfigCache();
-	expect(getConfig().locale).toBe("system");
+	expect(getConfig().locale).toBe("zh-CN");
 
 	const before = getConfig();
 	expect(() => updateConfig({ locale: "pt-br" })).toThrow("locale must be");

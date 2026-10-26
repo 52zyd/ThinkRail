@@ -4,7 +4,6 @@ import {
 	copyFileSync,
 	mkdirSync,
 	readdirSync,
-	readFileSync,
 	rmSync,
 	statSync,
 	writeFileSync,
@@ -12,7 +11,6 @@ import {
 import { basename, join, relative, resolve, sep } from "node:path";
 import type { BundledExtensions } from "@thinkrail/server";
 import type { BuildRuntimeSources } from "@thinkrail/server/build-support";
-import { injectChunkId, type SourceMapJson } from "./src/runtimeSourceMap";
 import { ptyLibraryName, runtimeTarget } from "./src/runtimeTarget";
 
 const desktopDir = import.meta.dir;
@@ -25,8 +23,9 @@ const bundledRuntimeKeys = {
 	skillsDir: "skillsDir",
 	trashHelpers: "trashHelpers",
 	webAccessFactory: "webAccessFactory",
-} as const satisfies { [Key in keyof BundledExtensions]-?: Key };
-
+} as const satisfies {
+	[Key in keyof BundledExtensions]-?: Key;
+};
 function runBun(args: string[]): void {
 	const result = spawnSync("bun", args, { cwd: repoRoot, stdio: "inherit" });
 	if (result.error) throw result.error;
@@ -34,7 +33,6 @@ function runBun(args: string[]): void {
 		throw new Error(`bun ${args.join(" ")} exited ${result.status ?? result.signal}`);
 	}
 }
-
 function resolveRuntimeSources(): BuildRuntimeSources {
 	const result = spawnSync(
 		"bun",
@@ -50,51 +48,6 @@ function resolveRuntimeSources(): BuildRuntimeSources {
 	}
 	return JSON.parse(result.stdout) as BuildRuntimeSources;
 }
-
-function sourceMapRelease(): string | null {
-	const release = process.env.THINKRAIL_SOURCEMAPS_RELEASE?.trim();
-	if (!release) return null;
-	if (!process.env.POSTHOG_CLI_API_KEY || !process.env.POSTHOG_CLI_PROJECT_ID) {
-		throw new Error(
-			"THINKRAIL_SOURCEMAPS_RELEASE needs POSTHOG_CLI_API_KEY and POSTHOG_CLI_PROJECT_ID",
-		);
-	}
-	return release;
-}
-
-function uploadRuntimeSourceMap(runtimeFile: string, release: string): void {
-	const mapFile = `${runtimeFile}.map`;
-	const injected = injectChunkId(
-		readFileSync(runtimeFile, "utf8"),
-		JSON.parse(readFileSync(mapFile, "utf8")) as SourceMapJson,
-		release,
-	);
-	writeFileSync(runtimeFile, injected.code);
-	rmSync(mapFile);
-	const uploadDir = join(stageDir, "sourcemaps");
-	mkdirSync(uploadDir, { recursive: true });
-	writeFileSync(join(uploadDir, "server-runtime.js"), injected.code);
-	writeFileSync(join(uploadDir, "server-runtime.js.map"), JSON.stringify(injected.map));
-	try {
-		runBun([
-			"run",
-			"posthog-cli",
-			"sourcemap",
-			"upload",
-			"--directory",
-			uploadDir,
-			"--release-name",
-			"thinkrail",
-			"--release-version",
-			release,
-			"--release-mode",
-			"symbol-set",
-		]);
-	} finally {
-		rmSync(uploadDir, { recursive: true, force: true });
-	}
-}
-
 function listFiles(root: string): string[] {
 	const files: string[] = [];
 	for (const name of readdirSync(root)) {
@@ -104,8 +57,6 @@ function listFiles(root: string): string[] {
 	}
 	return files;
 }
-
-const release = sourceMapRelease();
 runBun(["run", "build:web"]);
 const webMaps = listFiles(join(repoRoot, "apps", "web", "dist")).filter((file) =>
 	file.endsWith(".map"),
@@ -131,12 +82,11 @@ for (const helper of Object.values(sources.trashHelpers)) {
 	copyFileSync(helper, join(runtimeDir, basename(helper)));
 }
 if (process.platform !== "win32") chmodSync(join(runtimeDir, "macos-trash"), 0o755);
-
 try {
 	writeFileSync(
 		generatedEntry,
 		`${sources.extensions.map((extension, index) => `import factory${index} from ${JSON.stringify(extension.entry)};`).join("\n")}
-import { bootHost, registerBundledRuntime, reportDesktopError } from "@thinkrail/server";
+import { bootHost, registerBundledRuntime } from "@thinkrail/server";
 
 export async function startDesktopHost(options) {
   await registerBundledRuntime({
@@ -155,15 +105,8 @@ export async function startDesktopHost(options) {
     resolveShellEnv: true,
     staticDir: options.staticDir,
     appVersion: options.appVersion,
-    analytics: {
-      posthogApiKey: options.posthogProjectKey,
-      channel: options.channel,
-      build: "desktop",
-      appRoot: options.runtimeDir + "/..",
-      ...(options.openExternal ? { openExternal: options.openExternal } : {}),
-    },
   });
-  return { ...host, reportError: reportDesktopError };
+  return host;
 }
 `,
 	);
@@ -174,11 +117,9 @@ export async function startDesktopHost(options) {
 		"--target=bun",
 		"--define",
 		"PI_BUNDLED_NODE=true",
-		...(release ? ["--sourcemap=external"] : []),
 		`--outdir=${runtimeDir}`,
 		`--entry-naming=${basename(runtimeFile)}`,
 	]);
-	if (release) uploadRuntimeSourceMap(runtimeFile, release);
 } finally {
 	rmSync(generatedEntry, { force: true });
 }

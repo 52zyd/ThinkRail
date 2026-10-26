@@ -13,10 +13,10 @@ const requiredSitemapUrls = [
 ] as const;
 
 const desktopDownloadUrls = [
-	"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-darwin-arm64.dmg",
-	"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-windows-x64.zip",
-	"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-linux-x64.tar.gz",
-	"https://github.com/JetBrains/thinkrail/releases/latest/download/thinkrail-desktop-linux-arm64.tar.gz",
+	"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-darwin-arm64.dmg",
+	"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-windows-x64.zip",
+	"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-linux-x64.tar.gz",
+	"https://github.com/52zyd/ThinkRail/releases/latest/download/thinkrail-desktop-linux-arm64.tar.gz",
 ] as const;
 
 const analyticsFreePages = new Set(["404.html", "attribution/claim/index.html"]);
@@ -220,8 +220,8 @@ export async function validateBuild(distDirectory = `${import.meta.dir}/../dist`
 	for (const name of islandPages) {
 		for (const forbiddenCommandLineCopy of [
 			"Browser UI via command line",
-			"raw.githubusercontent.com/JetBrains/thinkrail/main/install.sh",
-			"raw.githubusercontent.com/JetBrains/thinkrail/main/install.ps1",
+			"raw.githubusercontent.com/52zyd/ThinkRail/main/install.sh",
+			"raw.githubusercontent.com/52zyd/ThinkRail/main/install.ps1",
 		]) {
 			if (pages[name].includes(forbiddenCommandLineCopy)) {
 				failures.push(`${name}: command-line option leaked: ${forbiddenCommandLineCopy}`);

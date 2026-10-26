@@ -103,7 +103,7 @@ const TERMINAL_LOGO: readonly string[] = [
 	"           T–––R  ^–––5  :––––:            R––––:  ~–––––^",
 ];
 
-const GITHUB_URL = "https://github.com/JetBrains/thinkrail";
+const GITHUB_URL = "https://github.com/52zyd/ThinkRail";
 const INSTALL_TARGET: Record<InstallPlatform, string> = {
 	macos: "macos-arm64",
 	linux: "linux",
@@ -432,7 +432,7 @@ if (navToggle && railRight && backdrop) {
 
 const stars = document.getElementById("gh-stars");
 if (stars) {
-	fetch("https://api.github.com/repos/JetBrains/thinkrail")
+	fetch("https://api.github.com/repos/52zyd/ThinkRail")
 		.then((response) => (response.ok ? response.json() : null))
 		.then((data: { stargazers_count?: number } | null) => {
 			if (typeof data?.stargazers_count !== "number") return;
@@ -498,7 +498,7 @@ if (mockElements.length > 0) {
 
 	const cta = document.createElement("div");
 	cta.className = "mock-tooltip-cta";
-	cta.innerHTML = `<a class="btn" href="https://github.com/JetBrains/thinkrail" target="_blank" rel="noopener noreferrer">
+	cta.innerHTML = `<a class="btn" href="https://github.com/52zyd/ThinkRail" target="_blank" rel="noopener noreferrer">
 		<svg class="i i-fill" aria-hidden="true"><use href="#i-github" /></svg>
 		Open on GitHub
 	</a>`;

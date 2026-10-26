@@ -6,7 +6,6 @@ export {
 	initializeJbcentralRuntime,
 	jbcentralLogin,
 	resetJbcentralStateForTests,
-	setJbcentralAppliedPublisher,
 	setJbcentralChangedPublisher,
 	startProxyJbcentral,
 	stopJbcentralRuntime,

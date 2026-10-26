@@ -69,12 +69,7 @@ const rebuildWaiters: RebuildWaiter[] = [];
 let actionTail = Promise.resolve();
 const actionFlights = new Map<JbcentralAction, Promise<JbcentralActionResult>>();
 let loginTask: Promise<JbcentralLoginResult> | null = null;
-let publishApplied: () => void = () => {};
 let publishChanged: () => void = () => {};
-
-export function setJbcentralAppliedPublisher(publisher: () => void): void {
-	publishApplied = publisher;
-}
 
 export function setJbcentralChangedPublisher(publisher: () => void): void {
 	publishChanged = publisher;
@@ -437,7 +432,6 @@ async function connect(): Promise<JbcentralActionResult> {
 		}
 		const rebuilt = await requestRuntimeRebuild("connect");
 		if (rebuilt.outcome === "failed") return failed(rebuilt.reason);
-		publishApplied();
 		return { outcome: "applied" };
 	} finally {
 		transientAction = null;
@@ -606,6 +600,5 @@ export async function resetJbcentralStateForTests(): Promise<void> {
 	actionTail = Promise.resolve();
 	actionFlights.clear();
 	loginTask = null;
-	publishApplied = () => {};
 	publishChanged = () => {};
 }

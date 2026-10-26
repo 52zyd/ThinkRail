@@ -48,7 +48,7 @@ export function Hero({ title, positioning }: { title: string; positioning: Posit
 
 						<Reveal delay={200}>
 							<div className="mt-9 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
-								<ActionButton href="https://github.com/JetBrains/thinkrail" variant="light">
+								<ActionButton href="https://github.com/52zyd/ThinkRail" variant="light">
 									<GithubIcon className="h-6 w-6 shrink-0" />
 									Explore on GitHub
 								</ActionButton>

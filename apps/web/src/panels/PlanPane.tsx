@@ -898,7 +898,6 @@ export default function PlanPane({
 		bodySource: "plan",
 		openReview,
 		status: branchStatus,
-		analyticsSource: "plan_page",
 		noteOpenReview,
 		refresh: refreshBranchStatus,
 	});

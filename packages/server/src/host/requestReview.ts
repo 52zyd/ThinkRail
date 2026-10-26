@@ -13,7 +13,6 @@ import {
 	sendReviewFixToSession,
 	setRequestReviewHandler,
 } from "../agent";
-import type { AdditionalAnalyticsCapture } from "../analytics";
 import { logger } from "../log";
 import {
 	addComment,
@@ -48,27 +47,21 @@ import {
 	onPlanChain,
 	releaseItemReview,
 } from "./planReviewQueue";
-import {
-	additionalCapture,
-	captureAdditional,
-	captureReviewCommentAdded,
-	captureReviewCommentsSent,
-} from "./productAnalytics";
 import { REVIEWER_OUTPUT_CONTRACT, REVIEWER_SYSTEM_PROMPT, REVIEWER_TOOLS } from "./reviewerRole";
 import { withReviewLock } from "./reviewLock";
 import { claimItemFix, itemFixFindings, itemOpenFindings, releaseItemFix } from "./todoReview";
 
 const log = logger("review");
-
 const DEFAULT_FIX_NOTE = "Address the reviewer's findings below.";
-
 let reviewFailedPublisher: (payload: ReviewFailedPayload) => void = () => {};
 export function setReviewFailedPublisher(fn: (payload: ReviewFailedPayload) => void): void {
 	reviewFailedPublisher = fn;
 }
-
-type ReviewParams = { workspaceId: string; sessionId: string; id: string };
-
+type ReviewParams = {
+	workspaceId: string;
+	sessionId: string;
+	id: string;
+};
 /** Resolve an item's display title across every plan collection — stored todos, grouped todos, AND
  * wire-only `adoptedCommits` (a Review-All target the plan never stored) — so a result card or a
  * detached-review failure toast names the commit subject, not the opaque `commit:<sha>` id. Falls back
@@ -87,11 +80,9 @@ export function itemTitleOf(
 		return all.find((t) => t.id === itemId)?.title ?? itemId;
 	});
 }
-
 function agentPath(path: string): string {
 	return path.replaceAll("\\", "/");
 }
-
 export function parseVerdict(
 	finalText: string | undefined,
 	itemId: string,
@@ -135,12 +126,19 @@ export function parseVerdict(
 		findings,
 	};
 }
-
 export type VerdictOutcome =
-	| { kind: "approved" }
-	| { kind: "approve-blocked"; openFindings: number }
-	| { kind: "changes"; canAutoFix: boolean; findings?: ReviewFixComment[] };
-
+	| {
+			kind: "approved";
+	  }
+	| {
+			kind: "approve-blocked";
+			openFindings: number;
+	  }
+	| {
+			kind: "changes";
+			canAutoFix: boolean;
+			findings?: ReviewFixComment[];
+	  };
 export function composeText(result: PlanReviewResult, outcome: VerdictOutcome): string {
 	const list = outcome.kind === "changes" ? (outcome.findings ?? result.findings) : result.findings;
 	const findings =
@@ -172,7 +170,6 @@ export function composeText(result: PlanReviewResult, outcome: VerdictOutcome): 
 		: "The automated fix cycle is spent or auto-fix is off: do NOT fix now. Report these findings to the user and wait for their direction.";
 	return `${head} ${next}${rationale}${findings}`;
 }
-
 /** File a reviewer finding into the Review tab (an inline comment when it anchors, else review-level).
  * Anchor resolution is best-effort — a bad anchor falls back to a review-level comment — but a store-write
  * failure propagates so the caller cancels the review rather than dropping the finding. See host/SPEC.md. */
@@ -208,7 +205,6 @@ async function fileFinding(
 		anchor: null,
 	});
 }
-
 /** File a whole finding set as one all-or-nothing operation: if any `fileFinding()` write throws
  * partway, the drafts already persisted in this call are deleted before the error propagates, so a
  * partial failure never strands open findings whose canonical ids the caller never received. All filed
@@ -217,14 +213,15 @@ async function fileFindings(
 	params: ReviewParams,
 	reviewedSha: string,
 	raw: ReviewFixComment[],
-	capture: AdditionalAnalyticsCapture | null,
-): Promise<{ filed: ReviewFixComment[]; comments: ReviewComment[] }> {
+): Promise<{
+	filed: ReviewFixComment[];
+	comments: ReviewComment[];
+}> {
 	const filed: ReviewFixComment[] = [];
 	const comments: ReviewComment[] = [];
 	try {
 		for (const f of raw) {
 			const persisted = await fileFinding(params, reviewedSha, f);
-			captureReviewCommentAdded(capture, persisted);
 			filed.push({ ...f, id: persisted.id });
 			comments.push(persisted);
 		}
@@ -234,7 +231,6 @@ async function fileFindings(
 	}
 	return { filed, comments };
 }
-
 /** Undo just-filed findings while the review lock is held: roll back any `sent` assignment first, then
  * delete the drafts. Compensates a review-record write that throws AFTER filing so a cancelled review
  * never leaves open findings whose canonical ids the worker never received. Best-effort per comment. */
@@ -252,7 +248,6 @@ async function unfileFindings(
 	}
 	for (const f of filed) await deleteComment(params.workspaceId, f.id).catch(() => {});
 }
-
 /** Own the whole button-path critical section: file the reviewer's findings, record cycle 1, select
  * them, and mark them `sent` — all in ONE `withReviewLock` hold — then deliver the structured
  * `todo-review-fix` message to the worker chat. Filing and reservation share the lock so no interleaved
@@ -267,18 +262,18 @@ async function deliverFixToWorker(
 	note: string,
 	reviewedSha: string,
 	raw: ReviewFixComment[],
-	record: (autoCycles: number) => { item: Todo },
-	capture: AdditionalAnalyticsCapture | null,
+	record: (autoCycles: number) => {
+		item: Todo;
+	},
 	recordGuide: () => Promise<void>,
 ): Promise<VerdictOutcome> {
 	let marked: string[] = [];
-	let sent: ReviewComment[] = [];
 	let filed: ReviewFixComment[] = [];
 	let recorded = false;
 	try {
 		const prepared = await withReviewLock(params.workspaceId, async () => {
 			const snapshot = await getReviewSnapshot(params.workspaceId);
-			filed = (await fileFindings(params, reviewedSha, raw, capture)).filed;
+			filed = (await fileFindings(params, reviewedSha, raw)).filed;
 			let item: Todo;
 			try {
 				item = record(1).item;
@@ -295,7 +290,6 @@ async function deliverFixToWorker(
 			if (sentIds.length > 0) {
 				await markCommentsSent(params.workspaceId, sentIds, params.sessionId);
 				marked = sentIds;
-				sent = findings;
 			}
 			return {
 				text: fixPackage
@@ -311,7 +305,6 @@ async function deliverFixToWorker(
 			};
 		});
 		await ackSend(sendReviewFixToSession(params.sessionId, prepared.text, prepared.details));
-		captureReviewCommentsSent(capture, sent);
 		return { kind: "changes", canAutoFix: true, findings: filed };
 	} catch (err) {
 		if (!recorded) throw err;
@@ -327,16 +320,12 @@ async function deliverFixToWorker(
 		releaseItemFix(params.sessionId, params.id);
 	}
 }
-
 async function recordVerdict(
 	params: ReviewParams,
 	result: PlanReviewResult,
 	reviewedSha: string,
 	deliverFix: boolean,
 ): Promise<VerdictOutcome> {
-	const capture = additionalCapture();
-	const decided = (verdict: "approved" | "changes_requested") =>
-		captureAdditional(capture, { name: "review_decided", params: { actor: "agent", verdict } });
 	const recordGuide = async (): Promise<void> => {
 		try {
 			await setReviewGuide(params.workspaceId, {
@@ -358,7 +347,6 @@ async function recordVerdict(
 			if (open.length === 0) {
 				approveTodoReview(params, "agent");
 				await recordGuide();
-				decided("approved");
 				return { kind: "approved" };
 			}
 			cancelTodoReview(params);
@@ -371,7 +359,6 @@ async function recordVerdict(
 			return { kind: "approve-blocked", openFindings: open.length };
 		});
 	}
-	decided("changes_requested");
 	const spent = todoReviewAutoCycles(params) ?? 0;
 	const canAutoFix = getConfig().reviewAutoFix !== false && spent < 1;
 	const note = result.summary || DEFAULT_FIX_NOTE;
@@ -386,7 +373,7 @@ async function recordVerdict(
 		// draft `sent` between two writes (defeating fileFindings' compensation), and a record-write failure
 		// deletes the just-filed drafts rather than stranding them past the cancel. See planReview.SPEC.md.
 		const findings = await withReviewLock(params.workspaceId, async () => {
-			const { filed } = await fileFindings(params, reviewedSha, result.findings, capture);
+			const { filed } = await fileFindings(params, reviewedSha, result.findings);
 			try {
 				record(2);
 			} catch (err) {
@@ -404,8 +391,8 @@ async function recordVerdict(
 		// canonical ids the worker never received. `fileFindings` compensates a mid-loop persist failure;
 		// a mark failure deletes the just-filed drafts; a record failure rolls the sent findings back and
 		// deletes them so the cancel leaves nothing open. See planReview.SPEC.md.
-		const { filed: findings, comments } = await withReviewLock(params.workspaceId, async () => {
-			const filing = await fileFindings(params, reviewedSha, result.findings, capture);
+		const { filed: findings } = await withReviewLock(params.workspaceId, async () => {
+			const filing = await fileFindings(params, reviewedSha, result.findings);
 			const { filed } = filing;
 			try {
 				await markCommentsSent(
@@ -426,7 +413,6 @@ async function recordVerdict(
 			await recordGuide();
 			return filing;
 		});
-		captureReviewCommentsSent(capture, comments);
 		return { kind: "changes", canAutoFix: true, findings };
 	}
 	// Button path: when we win the fix claim, deliverFixToWorker files + records + marks-sent + sends as
@@ -434,17 +420,9 @@ async function recordVerdict(
 	// the cycle itself. If we lost the claim (another fix is in flight) we only file the findings for the
 	// user, under the lock, and record the terminal cycle here. See planReview.SPEC.md.
 	if (claimItemFix(params.sessionId, params.id))
-		return deliverFixToWorker(
-			params,
-			note,
-			reviewedSha,
-			result.findings,
-			record,
-			capture,
-			recordGuide,
-		);
+		return deliverFixToWorker(params, note, reviewedSha, result.findings, record, recordGuide);
 	const findings = await withReviewLock(params.workspaceId, async () => {
-		const { filed } = await fileFindings(params, reviewedSha, result.findings, capture);
+		const { filed } = await fileFindings(params, reviewedSha, result.findings);
 		try {
 			record(2);
 		} catch (err) {
@@ -456,9 +434,7 @@ async function recordVerdict(
 	});
 	return { kind: "changes", canAutoFix: false, findings };
 }
-
 export type ReviewRunner = typeof runReviewSubagent;
-
 async function runReview(
 	params: ReviewParams,
 	pkg: string,
@@ -493,13 +469,15 @@ async function runReview(
 	if (!parsed) throw new Error("The review subagent did not return a valid verdict.");
 	return { ...parsed, ...(reviewedSha ? { reviewedSha } : {}) };
 }
-
 async function handleRequestReview(
 	sessionId: string,
 	itemId: string,
 	signal: AbortSignal | undefined,
 	runSubagent: ReviewRunner,
-): Promise<{ result: PlanReviewResult; text: string }> {
+): Promise<{
+	result: PlanReviewResult;
+	text: string;
+}> {
 	const workspaceId = getSessionWorkspaceId(sessionId);
 	if (!workspaceId) throw new Error("This chat is not attached to a workspace.");
 	if (!claimItemReview(sessionId, itemId)) throw new Error("This step is already being reviewed.");
@@ -526,7 +504,6 @@ async function handleRequestReview(
 		await publishReview(workspaceId).catch(() => {});
 	}
 }
-
 /** Button-triggered plan review; returns immediately. The `reviewing` mark MUST stay synchronous —
  * see planReview.SPEC.md. */
 export function startPlanReview(
@@ -562,7 +539,6 @@ export function startPlanReview(
 	if (started) recordWorkspaceActivity(workspaceId);
 	return started;
 }
-
 /** After a fix lands (the worker re-marks the step done), re-review exactly the items still inside their
  * one auto cycle — see host/SPEC.md ("auto re-review") for why `unreviewed` counts as a fresh delta.
  * Eligible items are enqueued onto the plan's serial chain even while another review runs; the per-item
@@ -588,7 +564,6 @@ export async function maybeAutoReReview(
 		log.warn(`auto re-review skipped (${workspaceId}/${sessionId})`, err);
 	}
 }
-
 export function installRequestReviewSeam(runSubagent: ReviewRunner = runReviewSubagent): void {
 	setRequestReviewHandler((sessionId, itemId, signal) =>
 		handleRequestReview(sessionId, itemId, signal, runSubagent),

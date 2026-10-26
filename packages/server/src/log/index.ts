@@ -6,6 +6,5 @@ export {
 	type LogLevel,
 	logger,
 	logsDir,
-	observeLoggedErrors,
 	setLogLevel,
 } from "./logging";

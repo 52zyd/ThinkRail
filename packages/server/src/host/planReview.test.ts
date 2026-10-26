@@ -21,7 +21,6 @@ import {
 	toWireModel,
 } from "../agent";
 import { createRequestReviewTool } from "../agent/requestReviewTool";
-import { initializeAnalytics, resetAnalyticsForTests, shutdownAnalytics } from "../analytics";
 import { saveWorkspaces } from "../persistence";
 import * as reviews from "../reviews";
 import { getReviewSnapshot } from "../reviews";
@@ -29,7 +28,6 @@ import { resetConfigCache, updateConfig } from "../settings";
 import * as todos from "../todos";
 import { todoReviewAutoCycles, todoReviewRecord } from "../todos";
 import { getWorkspace } from "../workspaces";
-import { handleRequest } from "./handlers";
 import { itemReviewActive } from "./planReviewQueue";
 import {
 	installRequestReviewSeam,
@@ -41,9 +39,7 @@ import {
 } from "./requestReview";
 import * as reviewLock from "./reviewLock";
 import { withReviewLock } from "./reviewLock";
-import { claimItemFix, isItemUnderActiveReview, releaseItemFix } from "./todoReview";
-
-const TEST_KEY = "phc_test";
+import { isItemUnderActiveReview } from "./todoReview";
 
 let dataDir: string;
 let worktree: string;
@@ -1035,116 +1031,5 @@ test("itemTitleOf labels a Review-All adopted commit with its subject, not the c
 		expect(await itemTitleOf(ws, "sess-adopt", "commit:deadbeef")).toBe("commit:deadbeef");
 	} finally {
 		rmSync(wt, { recursive: true, force: true });
-	}
-});
-
-test("only actual agent verdicts emit review decisions and agent-authored findings, and never leak plan content", async () => {
-	const events: { event: string; properties: Record<string, unknown> }[] = [];
-	initializeAnalytics({
-		posthogApiKey: TEST_KEY,
-		additionalEnabled: true,
-		env: {},
-		fetchImpl: (async (_url: string | URL | Request, init?: RequestInit) => {
-			events.push(...JSON.parse(String(init?.body)).batch);
-			return new Response("{}", { status: 200 });
-		}) as typeof fetch,
-	});
-	try {
-		updateConfig({ reviewAutoFix: false });
-		const sessionId = await workerSession();
-		for (const finalText of [approve, requestChanges, "no verdict here"]) {
-			const id = committedItem(sessionId, "private task");
-			startPlanReview(WS, sessionId, id, verdictRunner(finalText));
-			await settle(sessionId, id);
-		}
-		await shutdownAnalytics();
-		expect(
-			events
-				.filter((event) => event.event === "review_decided")
-				.map((event) => [event.properties.actor, event.properties.verdict]),
-		).toEqual([
-			["agent", "approved"],
-			["agent", "changes_requested"],
-		]);
-		expect(
-			events
-				.filter((event) => event.event === "review_comment_added")
-				.map((event) => [event.properties.author, event.properties.kind]),
-		).toEqual([["agent", "inline"]]);
-		expect(JSON.stringify(events)).not.toContain("private");
-	} finally {
-		await shutdownAnalytics();
-		resetAnalyticsForTests();
-	}
-});
-
-test("agent-delivered findings emit review_comment_sent on the button, tool and Request-fix paths", async () => {
-	const events: { event: string; properties: Record<string, unknown> }[] = [];
-	initializeAnalytics({
-		posthogApiKey: TEST_KEY,
-		additionalEnabled: true,
-		env: {},
-		fetchImpl: (async (_url: string | URL | Request, init?: RequestInit) => {
-			events.push(...JSON.parse(String(init?.body)).batch);
-			return new Response("{}", { status: 200 });
-		}) as typeof fetch,
-	});
-	const sentCount = () => events.filter((event) => event.event === "review_comment_sent").length;
-	try {
-		const sessionId = await workerSession();
-		const button = committedItem(sessionId, "button");
-		startPlanReview(WS, sessionId, button, verdictRunner(requestChanges));
-		await settle(sessionId, button);
-
-		installRequestReviewSeam(verdictRunner(requestChanges));
-		const tool = committedItem(sessionId, "tool");
-		const ctx = {
-			sessionManager: { getSessionId: () => sessionId },
-		} as unknown as ExtensionToolContext;
-		await createRequestReviewTool().execute(
-			"tc",
-			{ itemId: tool } as never,
-			undefined,
-			undefined,
-			ctx,
-		);
-
-		updateConfig({ reviewAutoFix: false });
-		const manual = committedItem(sessionId, "manual");
-		startPlanReview(WS, sessionId, manual, verdictRunner(requestChanges));
-		await settle(sessionId, manual);
-		await shutdownAnalytics();
-		expect(sentCount()).toBe(2);
-
-		initializeAnalytics({
-			posthogApiKey: TEST_KEY,
-			additionalEnabled: true,
-			env: {},
-			fetchImpl: (async (_url: string | URL | Request, init?: RequestInit) => {
-				events.push(...JSON.parse(String(init?.body)).batch);
-				return new Response("{}", { status: 200 });
-			}) as typeof fetch,
-		});
-		await handleRequest(
-			"todo.requestFix",
-			{ workspaceId: WS, sessionId, id: manual, feedback: "please fix" },
-			{ clientKey: "test" },
-		);
-		const deadline = Date.now() + 10_000;
-		while (!claimItemFix(sessionId, manual)) {
-			if (Date.now() > deadline) throw new Error("fix request never settled");
-			await new Promise((resolve) => setTimeout(resolve, 10));
-		}
-		releaseItemFix(sessionId, manual);
-		await shutdownAnalytics();
-		expect(sentCount()).toBe(3);
-		expect(
-			events
-				.filter((event) => event.event === "review_comment_sent")
-				.map((event) => event.properties.outdated),
-		).toEqual(["no", "no", "no"]);
-	} finally {
-		await shutdownAnalytics();
-		resetAnalyticsForTests();
 	}
 });

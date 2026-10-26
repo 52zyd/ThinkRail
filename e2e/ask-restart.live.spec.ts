@@ -15,7 +15,6 @@ import { expect, type Page, test } from "@playwright/test";
 import type { Workspace } from "@thinkrail/contracts";
 import { jbcentralExtensionPath } from "@thinkrail/shared/jbcentral";
 import { stripAmbientPiCredentials } from "./ambientCredentials";
-import { CONFIRMED_ANALYTICS_CONFIG } from "./fixtures/analyticsConsent";
 import { activeWorktreeRow } from "./fixtures/app";
 import {
 	CENTRAL_STUB_READ_ONLY_ENV,
@@ -36,6 +35,7 @@ import {
 	E2E_RESTART_HOST_LOG,
 	E2E_RESTART_PORT,
 } from "./fixtures/paths";
+import { ENGLISH_CONFIG } from "./fixtures/settingsConfig";
 import { E2eWire, E2eWireTransientError } from "./fixtures/wire";
 
 const PORT = E2E_RESTART_PORT;
@@ -61,7 +61,7 @@ function seedState(): void {
 	rmSync(HOST_LOG, { force: true });
 	mkdirSync(REPO, { recursive: true });
 	mkdirSync(HOME_DIR, { recursive: true });
-	writeFileSync(join(DATA_DIR, "config.json"), JSON.stringify(CONFIRMED_ANALYTICS_CONFIG));
+	writeFileSync(join(DATA_DIR, "config.json"), JSON.stringify(ENGLISH_CONFIG));
 	gitQuiet(REPO, "init", "-b", "main");
 	gitQuiet(REPO, "config", "user.email", "e2e@thinkrail.test");
 	gitQuiet(REPO, "config", "user.name", "ThinkRail E2E");

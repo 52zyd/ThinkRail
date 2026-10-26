@@ -17,9 +17,18 @@ const action = Bun.YAML.parse(readFileSync(actionPath, "utf8")) as {
 	runs: { steps: { id?: string; name?: string; run?: string; env?: Record<string, string> }[] };
 };
 const roots: string[] = [];
+const bash =
+	process.platform === "win32"
+		? resolve(Bun.which("git") ?? "git", "..", "..", "bin", "bash.exe")
+		: "bash";
+function shellPath(path: string): string {
+	const slash = path.replace(/\\/g, "/");
+	return slash.replace(/^([A-Za-z]):\//, (_, drive: string) => `/${drive.toLowerCase()}/`);
+}
 
 afterEach(() => {
-	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+	for (const root of roots.splice(0))
+		rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
 });
 
 const targets = [
@@ -112,30 +121,33 @@ function fixture(): string {
 function packageDesktop(root: string, target: string, channel: string) {
 	const script = action.runs.steps.find((step) => step.name === "Package desktop installer")?.run;
 	if (!script) throw new Error("desktop package script is missing");
-	return Bun.spawnSync(["bash", "-c", script], {
-		cwd: root,
-		env: {
-			...process.env,
-			PATH: `${join(root, "bin")}:${process.env.PATH}`,
-			SYSTEMROOT: "C:\\Windows",
-			TARGET: target,
-			CHANNEL: channel,
+	return Bun.spawnSync(
+		[bash, "-c", `export PATH=${JSON.stringify(shellPath(join(root, "bin")))}:$PATH\n${script}`],
+		{
+			cwd: root,
+			env: {
+				...process.env,
+
+				SYSTEMROOT: "C:\\Windows",
+				TARGET: target,
+				CHANNEL: channel,
+			},
+			stdout: "pipe",
+			stderr: "pipe",
 		},
-		stdout: "pipe",
-		stderr: "pipe",
-	});
+	);
 }
 
 function collect(root: string, target: string, channel: string) {
 	const collector = action.runs.steps.find((step) => step.id === "resolve-desktop")?.run;
 	if (!collector) throw new Error("desktop artifact collector is missing");
-	return Bun.spawnSync(["bash", "-c", collector], {
+	return Bun.spawnSync([bash, "-c", collector], {
 		cwd: root,
 		env: {
 			...process.env,
 			TARGET: target,
 			CHANNEL: channel,
-			GITHUB_OUTPUT: join(root, "outputs"),
+			GITHUB_OUTPUT: shellPath(join(root, "outputs")),
 		},
 		stdout: "pipe",
 		stderr: "pipe",
@@ -153,19 +165,22 @@ function stampIdentity(channel: string, key: string, extra: Record<string, strin
 	mkdirSync(bin, { recursive: true });
 	mkdirSync(join(root, "packages/shared/src"), { recursive: true });
 	writeFileSync(join(bin, "git"), "#!/bin/sh\necho abc1234\n", { mode: 0o755 });
-	const result = Bun.spawnSync(["bash", "-c", script], {
-		cwd: root,
-		env: {
-			...process.env,
-			PATH: `${bin}:${process.env.PATH}`,
-			VERSION: "1.2.3",
-			CHANNEL: channel,
-			POSTHOG_PROJECT_KEY: key,
-			...extra,
+	const result = Bun.spawnSync(
+		[bash, "-c", `export PATH=${JSON.stringify(shellPath(join(root, "bin")))}:$PATH\n${script}`],
+		{
+			cwd: root,
+			env: {
+				...process.env,
+
+				VERSION: "1.2.3",
+				CHANNEL: channel,
+				POSTHOG_PROJECT_KEY: key,
+				...extra,
+			},
+			stdout: "pipe",
+			stderr: "pipe",
 		},
-		stdout: "pipe",
-		stderr: "pipe",
-	});
+	);
 	const versionPath = join(root, "packages/shared/src/version.ts");
 	return {
 		result,
@@ -173,7 +188,7 @@ function stampIdentity(channel: string, key: string, extra: Record<string, strin
 	};
 }
 
-test("release stamping bakes the CI-supplied analytics key without echoing it", () => {
+test("release stamping is key-free even with legacy telemetry credentials", () => {
 	const { result, stamped } = stampIdentity("stable", "phc_release");
 	expect(result.exitCode).toBe(0);
 	expect(stamped).toBe(
@@ -181,46 +196,51 @@ test("release stamping bakes the CI-supplied analytics key without echoing it", 
 			'export const version = "1.2.3";',
 			'export const channel = "stable";',
 			'export const commit = "abc1234";',
-			'export const posthogProjectKey = "phc_release";',
 			"",
 		].join("\n"),
 	);
+	expect(stamped).not.toContain("posthog");
 	expect(`${result.stdout}${result.stderr}`).not.toContain("phc_release");
 });
 
-test.each([
-	{ channel: "stable", key: "" },
-	{ channel: "nightly", key: "not-a-key" },
-	{ channel: "dev", key: "phc_release" },
-])("release stamping fails closed for %j", ({ channel, key }) => {
-	const { result, stamped } = stampIdentity(channel, key);
+test("release stamping rejects development channel", () => {
+	const { result, stamped } = stampIdentity("dev", "");
 	expect(result.exitCode).not.toBe(0);
 	expect(stamped).toBeUndefined();
 });
 
-test("a source-map upload key without its project id fails closed before stamping", () => {
-	const missing = stampIdentity("stable", "phc_release", { POSTHOG_CLI_API_KEY_SET: "true" });
-	expect(missing.result.exitCode).not.toBe(0);
-	expect(missing.stamped).toBeUndefined();
-	const paired = stampIdentity("stable", "phc_release", {
-		POSTHOG_CLI_API_KEY_SET: "true",
-		POSTHOG_CLI_PROJECT_ID: "1",
-	});
-	expect(paired.result.exitCode).toBe(0);
-	expect(
-		stampIdentity("stable", "phc_release", { POSTHOG_CLI_API_KEY_SET: "false" }).result.exitCode,
-	).toBe(0);
+test("the build recipe accepts no telemetry or upload credentials", () => {
+	expect(readFileSync(actionPath, "utf8").toLowerCase()).not.toContain("posthog");
 });
 
-test("source-map credentials reach only the web and desktop build steps", () => {
-	const credentialed = action.runs.steps
-		.filter((step) => step.env && "POSTHOG_CLI_API_KEY" in step.env)
-		.map((step) => step.name);
-	expect(credentialed).toEqual([
-		"Build web UI",
-		"Build and smoke desktop app",
-		"Package desktop installer",
-	]);
+test("Windows publication waits for every gate and publishes the official feed archive first", () => {
+	const workflow = readFileSync(
+		resolve(import.meta.dir, "../../../.github/workflows/release-windows.yml"),
+		"utf8",
+	);
+	for (const gate of [
+		"check:deps",
+		"check:boundaries",
+		"check:seams",
+		"check:spec-surface",
+		"check:i18n",
+		"check:compiler",
+		"lint",
+		"typecheck",
+		"test",
+		"e2e",
+	]) {
+		expect(workflow).toContain(`bun run ${gate}`);
+	}
+	expect(workflow).toContain("needs: build");
+	expect(workflow).toContain('default: "0.1.0"');
+	expect(workflow).toContain("--latest=false");
+	expect(workflow).toContain("refs/heads/main");
+	expect(workflow).toContain("52zyd/ThinkRail");
+	expect(workflow).not.toContain("e2e:full");
+	expect(
+		workflow.indexOf("gh release upload desktop-updates stable-win-x64-ThinkRail.tar.zst"),
+	).toBeLessThan(workflow.indexOf("gh release upload desktop-updates stable-win-x64-update.json"));
 });
 
 test("Windows packaging places System32 tar ahead of Git tar", () => {
@@ -231,19 +251,19 @@ test("Windows packaging places System32 tar ahead of Git tar", () => {
 	mkdirSync(system32, { recursive: true });
 	writeFileSync(
 		join(bin, "cygpath"),
-		`#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(join(root, "windows"))}\n`,
+		`#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(shellPath(join(root, "windows")))}\n`,
 		{ mode: 0o755 },
 	);
 	writeFileSync(join(system32, "tar"), "#!/bin/sh\nexit 0\n", { mode: 0o755 });
 	writeFileSync(
 		join(bin, "bun"),
-		`#!/bin/sh\nprintf '%s\\n%s\\n' "$PATH" "$*" > ${JSON.stringify(join(root, "package-call"))}\n`,
+		`#!/bin/sh\nprintf '%s\\n%s\\n' "$PATH" "$*" > ${JSON.stringify(shellPath(join(root, "package-call")))}\n`,
 		{ mode: 0o755 },
 	);
 	const result = packageDesktop(root, "bun-windows-x64", "nightly");
 	expect(result.exitCode).toBe(0);
 	const [path, args] = readFileSync(join(root, "package-call"), "utf8").split("\n");
-	expect(path?.split(":")[0]).toBe(system32);
+	expect(path?.split(":")[0]).toBe(shellPath(system32));
 	expect(args).toBe("run --cwd apps/desktop package:canary");
 });
 
@@ -253,12 +273,12 @@ test("non-Windows packaging does not require cygpath or rewrite PATH", () => {
 	mkdirSync(bin, { recursive: true });
 	writeFileSync(
 		join(bin, "bun"),
-		`#!/bin/sh\nprintf '%s\\n%s\\n' "$PATH" "$*" > ${JSON.stringify(join(root, "package-call"))}\n`,
+		`#!/bin/sh\nprintf '%s\\n%s\\n' "$PATH" "$*" > ${JSON.stringify(shellPath(join(root, "package-call")))}\n`,
 		{ mode: 0o755 },
 	);
 	expect(packageDesktop(root, "bun-linux-x64", "stable").exitCode).toBe(0);
 	const [path, args] = readFileSync(join(root, "package-call"), "utf8").split("\n");
-	expect(path?.split(":")[0]).toBe(bin);
+	expect(path?.split(":")[0]).toBe(shellPath(bin));
 	expect(args).toBe("run --cwd apps/desktop package:stable");
 });
 

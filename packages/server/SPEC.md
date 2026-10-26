@@ -22,9 +22,8 @@ e2e).
   (project/workspace/git/fs/terminal + the in-process `AgentSession` manager), and `~/.thinkrail`
   persistence.
 - **Public surface:** `createServer(options) → Promise<RunningServer>`
-  (`{ port, startAttributionClaim, stop, shutdown }`) — saved-choice attribution waits for the launcher's
-  explicit UI-readiness call; `stop()` is synchronous resource disposal for low-level tests while `shutdown()` is the idempotent,
-  bounded production lifecycle (settle sessions + drain turn receipts/analytics and dispose sockets/PTYS/watchers)
+  (`{ port, stop, shutdown }`); `stop()` is synchronous resource disposal for low-level tests while `shutdown()` is the idempotent,
+  bounded production lifecycle (settle sessions + drain turn receipts and dispose sockets/PTYS/watchers)
   every launcher must await — the public
   factory starts Central artifact watching and applies the initial current PI runtime before binding a socket
   or exposing handlers—falling back to a plain runtime with closed `load-failed` status when the configured
@@ -92,7 +91,6 @@ internals**. The edges between them are owned here (see the dependency graph), n
 | `extensions` | the server registry of ThinkRail extensions (`@thinkrail/ext-*/server`): ordered descriptors + public specifiers, inline flattening, owner-scoped skill resolution | [extensions/SPEC.md](src/extensions/SPEC.md) |
 | `auth` | provider status/login plus native JetBrains Central lifecycle and quota orchestration | [auth/SPEC.md](src/auth/SPEC.md) |
 | `assist` | ad-hoc one-shot tasks (plan summaries, PR descriptions) on a cheap model, best-effort | [assist/SPEC.md](src/assist/SPEC.md) |
-| `analytics` | always-on basic events + sanitized error reports, and preference-controlled optional insights → PostHog sink (privacy contract in its spec) | [analytics/SPEC.md](src/analytics/SPEC.md) |
 | `feedback` | host-scoped usage count + addressed product-interview invitation lifecycle | [feedback/SPEC.md](src/feedback/SPEC.md) |
 | `dialog` | the host's native folder picker | [dialog/SPEC.md](src/dialog/SPEC.md) |
 | `editors` | detect installed editors/IDEs, launch one at a worktree, reveal a worktree in the file manager | [editors/SPEC.md](src/editors/SPEC.md) |
@@ -107,19 +105,19 @@ the host from env via `bootHost` for dev/e2e.
 
 `host` is the **only composition root** — it wires each feature's handlers into the WS registry.
 
-- `host` → `projects`, `workspaces`, `git`, `github`, `branch-review`, `pr`, `fs`, `spec`, `todos`, `reviews`, `changes`, `turns`, `watch`, `terminal`, `dialog`, `editors`, `agent`, `auth`, `assist`, `settings`, `locales`, `history`, `templates`, `analytics`, `feedback`, `log`, `persistence` (`dataDir`, for the crash report)
+- `host` → `projects`, `workspaces`, `git`, `github`, `branch-review`, `pr`, `fs`, `spec`, `todos`, `reviews`, `changes`, `turns`, `watch`, `terminal`, `dialog`, `editors`, `agent`, `auth`, `assist`, `settings`, `locales`, `history`, `templates`, `feedback`, `log`, `persistence` (`dataDir`, for the crash report)
 - `workspaces` → `projects`, `git`, `persistence`
 - `branch-review` → `git`, `subprocess`
 - `pr` → `workspaces`, `git`, `todos`, `branch-review` (provider detection + gh-output parsing + the shared CLI runner), `github` (`ghSetupProblem` — the named compare-fallback reason)
 - `projects` → `git` (shared runner), `persistence`
 - `git` → `subprocess` (every child that talks to a network or another CLI), `fs` (`resourceMeta`/`decodeText` — a diff side's content classification is the same one `fs.readFile` reports)
 - `changes` → `git` (the scope→range resolver + the original side's blob at its resolved oid), `fs` (path containment + byte identity), `persistence` (workspace lookup), `trash` (a revert that removes a file)
-- `turns` → `git` (`snapshotWorktree` + the `turn` scope's `gitStatus`), `persistence` (`turns.json`), `log`; it never imports `agent` — `host` feeds it the session event stream and resolves a session to its workspace, the same composition the run analytics observer uses
+- `turns` → `git` (`snapshotWorktree` + the `turn` scope's `gitStatus`), `persistence` (`turns.json`), `log`; it never imports `agent` — `host` feeds it the session event stream and resolves a session to its workspace
 - `github` → `subprocess` (both `gh auth status` probes run under the same bounded runner as `git`/`branch-review`)
-- `git`, `fs`, `spec`, `watch`, `terminal`, `settings`, `locales`, `analytics`, `feedback` → `persistence` (`locales` also → `@thinkrail/locales` root, external-style: catalog validation and file naming) (`spec` also → `pi-spec-graph/core`, external; `analytics` also → the pi-ai built-in provider/model catalog + `posthog-node`, external—the identity-bucketing vocabulary and delivery SDK)
+- `git`, `fs`, `spec`, `watch`, `terminal`, `settings`, `locales`, `feedback` → `persistence` (`locales` also → `@thinkrail/locales` root, external-style: catalog validation and file naming) (`spec` also → `pi-spec-graph/core`, external
 - `log` → `persistence` (`dataDir`) — and **any feature module (+ `host`) may → `log`**: it is the one
   cross-cutting edge, like `persistence`, exempt from the never-each-other rule (today: `host`,
-  `agent`, `workspaces`, `watch`, `git`, `todos`, `reviews`, `analytics`). `persistence` never imports
+  `agent`, `workspaces`, `watch`, `git`, `todos`, `reviews`). `persistence` never imports
   `log` (would cycle); `initLogging` is called only from `host`'s `bootHost`
 - `todos` → `workspaces` (worktree path lookup) + `pi-todos/core` (external, value-imported, pi-free)
 - `reviews` → `workspaces` (worktree path lookup), `persistence` (data dir), `git` (the review's baseSha
@@ -148,9 +146,9 @@ own never import `host` either: they expose a **publisher-injection seam** (`set
 `project.updated` lifecycle, `workspaces`' `setWorkspacePublisher` for the
 `workspace.created`/`updated`/`removed` lifecycle trio, `settings`' `setSettingsPublisher` for
 `settings.changed` (full merged config plus the successful applied update for host-side explicit-field effects),
-`feedback`'s addressed invitation publisher, and auth's Central action analytics +
+`feedback`'s addressed invitation publisher, and auth's
 `provider.changed` invalidation publishers) that
-`host` installs at `createServer`—so channel/analytics wiring lives only in `host`. Current layout has no
+`host` installs at `createServer`—so channel wiring lives only in `host`. Current layout has no
 host module, persistence, method, or publisher.
 
 `settings` validates the bounded resource-free custom-layout-preset catalog it owns. Current/default preset,
@@ -163,11 +161,8 @@ another for that handshake.
 registry-free too — it takes a plain `cwd`, never a `workspaceId`; the `template.*` handler resolves
 `workspaceId` → `cwd` via `workspaces` before calling into `templates`.
 
-Analytics is host-mediated the same way: **every capture call site lives in `host`**. Host translates
-existing boot, session, setup, task, review and PR observations into the closed event vocabulary and
-syncs the additional-data delivery gate from applied updates that explicitly contain `analyticsEnabled`;
-unrelated settings broadcasts preserve the current preference. Correlation stays host-local and clears when
-sharing is disabled. `analytics` has no `settings` edge and no feature module knows analytics exists.
+Application telemetry and remote error reporting are absent. Local diagnostic logs remain,
+and the legacy browser error method discards its payload.
 
 The Chat Resources integration adds `agent` → `pi-background-commands` as an external
 package edge, alongside its existing delegation packages. `host` continues to compose the wire
@@ -189,8 +184,7 @@ and calls `refreshExtensionTools()` after an applied update that contains `disab
 
 - **No process isolation** — a fatal agent/provider fault takes the whole host down (accepted tradeoff).
 - **No general cross-process state coordination** — `bootHost` permits multiple hosts to use the same data
-  directory. Installation identity, its one-time event claim, and browser-attribution attempts use narrow
-  exclusive filesystem operations; other shared persistence has no general lock, transaction, or
+  directory. Shared persistence has no general lock, transaction, or
   convergence guarantee, so concurrent writes may be last-writer-wins.
 - **One graceful shutdown per host** — launchers await `RunningServer.shutdown()`; repeated calls share one
   promise, while abrupt death relies on operating-system process cleanup.

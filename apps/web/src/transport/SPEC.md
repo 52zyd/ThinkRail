@@ -134,22 +134,14 @@ Workspace removal cancels its active MCP login through `provider.loginCancel` af
 modal. Late login frames for tombstoned workspaces are cancelled instead of installed; the MCP start
 response path does the same if removal preceded its acknowledgement. Cancellation is best-effort over
 the existing reconnect-safe request transport; the host's bounded probe lifetime remains the final cleanup.
-**Client error reports** (`errorReports.ts`): `installClientErrorReporting()` listens for window `error` /
-`unhandledrejection`, and `reportClientError(clientErrorReport(kind, error, boundary?))` forwards the raw
-class and the stack with the message cut out of it (a V8 stack header repeats the message, and its lines
-can look like frames) over fire-and-forget `client.reportError` — only to a host with
-`CLIENT_ERROR_REPORT_PROTOCOL_VERSION` (v90); reports raised before the welcome wait for it (≤ 10 queued), and a
-page sends at most 50. Each report carries the PostHog chunk ids (≤ 20) that the release build's
-injected `_posthogChunkIds` registry assigns to URLs in its own stack, so uploaded maps resolve its frames.
-The browser never scrubs or holds a vendor client: the host is the only sanitizer.
-`main.tsx` installs the listeners and injects the forwarder into `components`' error-boundary seam.
+Browser faults remain in the local console and error-boundary recovery UI. No error listeners
+forward fault payloads to the host; `client.reportError` exists only as a discarded legacy host request.
 
 - **Public surface (barrel):** `initTransport`, `getTransport`, `prewarmWorkspaceSkillLoad`, the three
   skill-load-safe session request wrappers, `errorText`, `RequestError`, `wsErrorCode`, `requestMcpList`,
   `watchMcpWorkspace`, `ConnectionStatus`,
   `TransportOptions`, `runHostUpdate`, `supportsHostUpdateRun`, `supportsPlanReview`,
-  `supportsPlanSummaryGeneration`, `supportsChangeMutations`, `supportsRichAnchors`, `supportsTurnChanges`,
-  `installClientErrorReporting`, `reportClientError`, `clientErrorReport`. `runHostUpdate` is the typed empty host action
+  `supportsPlanSummaryGeneration`, `supportsChangeMutations`, `supportsRichAnchors`, `supportsTurnChanges`.. `runHostUpdate` is the typed empty host action
   and `supportsHostUpdateRun` lets `Shell` inject it only for protocol v70+; `supportsPlanReview` is exported
   because a sibling panel (`PlanPane`) gates the plan-review UI on it — an older host serves no
   `todo.startReview`/`reviewAll`, so the client must not offer them; `supportsPlanSummaryGeneration` (v69) is

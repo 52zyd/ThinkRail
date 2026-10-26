@@ -21,7 +21,6 @@ import {
 	setSessionPublisher,
 	toWireModel,
 } from "../agent";
-import { resetAnalyticsForTests } from "../analytics";
 import { resetJbcentralStateForTests } from "../auth";
 import * as git from "../git";
 import { loadTurns, saveWorkspaces } from "../persistence";
@@ -80,7 +79,6 @@ afterEach(async () => {
 	setSessionPublisher(() => {});
 	setTurnPublisher(() => {});
 	setSessionManagerFactory((cwd) => SessionManager.create(cwd));
-	resetAnalyticsForTests();
 	resetConfigCache();
 	await resetJbcentralStateForTests();
 	configurePiRuntimeFactory();
@@ -160,7 +158,7 @@ test.each([
 		});
 		configurePiRuntime(null);
 		configurePiRuntimeFactory(async () => runtime);
-		server = await createServer({ port: 0, analytics: { mute: true } });
+		server = await createServer({ port: 0 });
 		const { sessionId } = await createSession({
 			cwd: repo,
 			workspaceId: "w1",

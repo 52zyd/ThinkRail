@@ -2,7 +2,7 @@
 # ThinkRail binary installer — downloads the single-file `thinkrail` executable for your platform from
 # the GitHub releases, verifies its checksum, and puts it on your PATH.
 #
-#   curl -fsSL https://raw.githubusercontent.com/JetBrains/thinkrail/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/52zyd/ThinkRail/main/install.sh | bash
 #
 # Options (pass after `-s --`):
 #   --channel stable|nightly   (default: stable)
@@ -16,7 +16,7 @@
 
 set -euo pipefail
 
-REPO="${THINKRAIL_REPO:-JetBrains/thinkrail}"
+REPO="${THINKRAIL_REPO:-52zyd/ThinkRail}"
 CHANNEL="stable"
 VERSION="latest"
 if [ -z "${HOME:-}" ]; then
@@ -31,7 +31,7 @@ usage() {
 ThinkRail binary installer.
 
 Usage:
-  curl -fsSL https://raw.githubusercontent.com/JetBrains/thinkrail/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/52zyd/ThinkRail/main/install.sh | bash
   curl -fsSL ... | bash -s -- --channel nightly --version 0.2.0-nightly.4 --prefix ~/.local
 
 Options:

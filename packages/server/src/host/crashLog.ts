@@ -1,6 +1,5 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { reportFatalError } from "../analytics";
 import { describeError } from "../log";
 import { dataDir } from "../persistence";
 
@@ -40,7 +39,7 @@ export function installCrashLog(appVersion?: string): void {
 		}
 		if (crashing) return;
 		crashing = true;
-		void reportFatalError(error, kind).finally(() => process.exit(1));
+		process.exit(1);
 	};
 	process.on("uncaughtException", (error) => report("uncaughtException", error));
 	process.on("unhandledRejection", (reason) => report("unhandledRejection", reason));

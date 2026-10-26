@@ -513,7 +513,7 @@ a project picker, the prompt hero, and the reused
   **store-driven two-pane shell**: one nav list, rendered once, beside a scrollable content pane. At `md`+
   the list is a rail grouped **Agent** (Models, Providers, MCP servers, Prompt templates) ·
   **Interface** (Chat, Appearance, Language, Layout, Terminal) · **System** (Workspaces, Integrations, Extensions,
-  Notifications, Privacy, Updates). Integrations keeps section id `github`: today it is the GitHub CLI page
+  Notifications, Updates). Integrations keeps section id `github`: today it is the GitHub CLI page
   and it is the home for further integrations. Below `md` the same list is a horizontal scrolling strip without group labels. The
   API-platform recommendation (`settings-api-platform`) belongs to that list at every width, pinned to
   the rail's bottom at `md`+. It is a real anchor that preserves the configured referral URL, opening
@@ -860,17 +860,7 @@ a project picker, the prompt hero, and the reused
   channel — the visible, in-app acquisition path that does not depend on an
   out-of-focus event. The notification pipeline, suppression, and away-path permission preface live in
   [[submodule-web-notifications]].
-  **`PrivacySettings`** manages the additional-data preference and
-  confirmation together; the event contract belongs to [[submodule-server-analytics]].
-  **`AnalyticsConsentDialog`** mounts once through shell after a capable host's unconfirmed config hydrates.
-  It initializes the draft switch on and immediately persists `{ analyticsEnabled: true }`; persistence and
-  broadcast activate the host gate while the dialog stays open. **Done**, Close, Escape, and backdrop persist
-  the current draft with `analyticsConsentConfirmed: true`, so the ordinary result is on. Switching off
-  immediately persists off/confirmed and the resulting config broadcast closes the dialog. Confirmed on/off
-  configurations never mount or prime. Failed persistence leaves the draft and error visible for retry. Saved
-  decisions survive restarts and change later through Settings. The dialog keeps only the short
-  product-usage copy and shared switch; Settings adds the optional outcomes, report dimensions, and
-  excluded content. Older hosts retain their legacy privacy control without the new consent dialog.
+  Privacy navigation, usage preferences and the consent modal are removed in this fork.
   **`FeedbackSettings`** remains a live section for existing deep links, but is no longer advertised in
   the navigation rail: the same interview copy as the automatic prompt, stating that completing a
   user interview about the participant's ThinkRail experience earns 100 bonus credits in Central
@@ -952,7 +942,7 @@ a project picker, the prompt hero, and the reused
   renders `extensions-failed`. Disabling never unregisters a tool renderer
   ([[submodule-web-extensions]]), so past transcripts still render.
   `ProvidersSettings`/`McpSettings`/`AppearanceSettings`/`LineWidthControl`/`ChatSettings`/`TemplatesSettings`/
-  `WorkspacesSettings`/`PrivacySettings`/`ModelsSettings`/`FeedbackSettings`/`ExtensionsSettings` and the app-wide **`InterviewPromptDialog`** are the
+  `WorkspacesSettings`/`ModelsSettings`/`FeedbackSettings`/`ExtensionsSettings` and the app-wide **`InterviewPromptDialog`** are the
   panels-owned **integration pieces** (store + transport). The prompt renders the shared incentive copy and
   fixed Calendar anchor with `Schedule an interview`, `Not now`, and `Never show again` actions. Primary and
   middle-button booking activation open Calendar immediately and record `book`; close, Escape, and backdrop record `postpone`; permanent

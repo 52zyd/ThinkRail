@@ -27,7 +27,7 @@ pi's `turn_*` (one assistant message): a receipt per message would fragment one 
   with the workspace), `listTurns(workspaceId)`, `turnScope(turn)`, the `turn.changed` publisher seam.
 - **Public surface (barrel):** `TurnTracker`, `listTurns`, `forgetWorkspaceTurns`, `setTurnPublisher`,
   `turnScope`.
-- **Consumers:** `host` wires the tracker into the session publisher beside run analytics and serves
+- **Consumers:** `host` wires the tracker into the session publisher without a telemetry observer and serves
   `workspace.turns`; `git` resolves a `turn` scope as `diff <baseTree> <headTree>` with both sides
   immutable (no untracked pass, `modifiedRef` set — so `changes` refuses to mutate it, exactly like a
   commit scope).

@@ -56,7 +56,6 @@ describe("settingsNavGroups", () => {
 					SettingsSection.Github,
 					SettingsSection.Extensions,
 					SettingsSection.Notifications,
-					SettingsSection.Privacy,
 					SettingsSection.Updates,
 				],
 			],
@@ -152,6 +151,7 @@ describe("resolveSettingsSection", () => {
 
 	test("removed sections fall back to Appearance", () => {
 		const groups = settingsNavGroups(LATEST, true);
+		expect(resolveSettingsSection("privacy", groups)).toBe(SettingsSection.Appearance);
 		expect(resolveSettingsSection(SettingsSection.Review, groups)).toBe(SettingsSection.Appearance);
 		expect(resolveSettingsSection(SettingsSection.LineWidth, groups)).toBe(
 			SettingsSection.Appearance,
@@ -164,10 +164,12 @@ describe("resolveSettingsSection", () => {
 				label: "Only",
 				sections: settingsNavGroups(LATEST, true)
 					.flatMap((g) => g.sections)
-					.filter((s) => s.id === SettingsSection.Privacy),
+					.filter((s) => s.id === SettingsSection.Notifications),
 			},
 		];
-		expect(resolveSettingsSection(SettingsSection.Models, groups)).toBe(SettingsSection.Privacy);
+		expect(resolveSettingsSection(SettingsSection.Models, groups)).toBe(
+			SettingsSection.Notifications,
+		);
 		expect(resolveSettingsSection(SettingsSection.Models, [])).toBe(SettingsSection.Appearance);
 	});
 });
