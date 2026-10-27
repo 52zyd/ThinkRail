@@ -16,7 +16,12 @@ import {
 	fauxAssistantMessage,
 	fauxToolCall,
 } from "@earendil-works/pi-ai/providers/faux";
-import { AgentSession, ModelRuntime, SessionManager } from "@earendil-works/pi-coding-agent";
+import {
+	AgentSession,
+	getShellConfig,
+	ModelRuntime,
+	SessionManager,
+} from "@earendil-works/pi-coding-agent";
 import type { AskUserQuestionResult, SessionResources, SessionState } from "@thinkrail/contracts";
 import type { ChildHandle } from "pi-delegation";
 import { setTrashImplementationForTests } from "../trash";
@@ -40,6 +45,7 @@ import {
 	setSessionStatePublisher,
 	setSkillAdmissionResolver,
 	settleSessionsForShutdown,
+	withSessionResources,
 } from "./agentSessionManager";
 import { ASK_ACK_TEXT, assessAnswerability } from "./askUserQuestion";
 import {
@@ -251,11 +257,12 @@ test("scoped catalog notifications expose stopping before settlement, never outp
 test("natural completion wakes once after reload, and shell settings use the current parent identity", async () => {
 	const workspaceId = `resources-${++sequence}`;
 	const cwd = mkdtempSync(join(root, "shell-"));
+	const shellPath = getShellConfig().shell;
 	mkdirSync(join(cwd, ".pi"));
 	writeFileSync(
 		join(cwd, ".pi", "settings.json"),
 		JSON.stringify({
-			shellPath: "/bin/bash",
+			shellPath,
 			shellCommandPrefix: "export RESOURCE_PREFIX=effective",
 		}),
 	);
@@ -432,9 +439,12 @@ test("workspace archive stops existing resources before awaiting parent preparat
 	const workspaceId = `archive-preparation-${++sequence}`;
 	const existing = await createSession({ cwd, workspaceId });
 	const marker = join(cwd, "existing-command");
-	await launch(
+	const commandId = await launch(
 		{ cwd, workspaceId, sessionId: existing.sessionId },
 		`while :; do printf x >> '${marker}'; sleep 0.02; done`,
+	);
+	const command = await withSessionResources(workspaceId, existing.sessionId, cwd, (commands) =>
+		commands.find(commandId),
 	);
 	await waitFor(async () => existsSync(marker));
 	const original = AgentSession.prototype.bindExtensions;
@@ -456,7 +466,7 @@ test("workspace archive stops existing resources before awaiting parent preparat
 		void archiving.then(() => {
 			archived = true;
 		});
-		await Bun.sleep(40);
+		await waitFor(async () => command?.snapshot.status === "stopped");
 		expect(archived).toBe(false);
 		const markerSize = readFileSync(marker).length;
 		await Bun.sleep(80);
@@ -898,7 +908,10 @@ test("a non-waking command completion persists only after an unrelated parent to
 test("shutdown and disposal signal commands and every child before waiting for a gated parent", async () => {
 	const p = await parent();
 	const marker = join(p.cwd, "running");
-	await launch(p, `while :; do printf x >> '${marker}'; sleep 0.02; done`);
+	const commandId = await launch(p, `while :; do printf x >> '${marker}'; sleep 0.02; done`);
+	const command = await withSessionResources(p.workspaceId, p.sessionId, p.cwd, (commands) =>
+		commands.find(commandId),
+	);
 	const service = delegationServiceFor(p.workspaceId);
 	const childGate = deferred();
 	let childrenEntered = 0;
@@ -937,6 +950,7 @@ test("shutdown and disposal signal commands and every child before waiting for a
 	try {
 		await waitFor(async () => children[4]?.snapshot?.status === "aborted");
 		await shuttingDown;
+		await waitFor(async () => command?.snapshot.status === "stopped");
 		const length = readFileSync(marker).length;
 		await Bun.sleep(80);
 		expect(readFileSync(marker).length).toBe(length);

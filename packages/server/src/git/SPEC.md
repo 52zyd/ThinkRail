@@ -10,6 +10,24 @@ tags: [public-surface-checked]
 
 ## Responsibility
 
+`listBranchesForCleanup(projectId)` reads local branch oids, the fully qualified repository default
+target and all worktree registrations; unreadable facts reject the catalog. `deleteLocalBranch(input)`
+revalidates the preview, merge status and worktree occupancy before Git's branch deletion; unmerged
+commits require `allowUnmerged: true` and an exact typed name. Merged branches use Git's non-force
+delete, so Git may additionally refuse a branch not merged into its configured upstream. Host
+composition adds workspace-record protection. A repository
+key from `repositoryCleanupKey(projectId)` identifies the common git directory for host serialization.
+No remote operations, checkout or garbage collection belong to this surface.
+`listGitWorktrees` and `listGitWorktreesSync` share one validated registry parser; cleanup uses the
+synchronous read to verify a missing managed checkout is already unregistered before forgetting it.
+Cleanup resolves the same default-target precedence as creation but never borrows creation's
+best-effort fallback after a failed read. Multi-branch history counts are asynchronous; mutation
+rechecks remain synchronous with the write. Unconfigured or dangling remote defaults reject cleanup.
+Deletion accepts only an exact local ref name present in the refreshed Git catalog, never a
+filesystem case alias. Default targets must also name a listed ref exactly. On Windows, occupancy
+and local-reference protection compare case-insensitively because loose refs can resolve through
+filesystem case aliases even when Git's own checked-out-branch guard does not catch them.
+
 Git plumbing: the low-level `git` runner (sync + async) plus a worktree's changed files and diffs over a
 **diff scope**, that scope's single definition (the range resolver), a project repo's branch list for the
 branch pickers, the workspace branch's own commit list, and a background prefetch that warms a remote base
@@ -309,7 +327,8 @@ ref off the workspace-create critical path.
   `resolveDiffRange`, `changedFileArgs`, `diffBaseRef`, `resolveCommitOid`, `DiffRange`, `isSafeRef`,
   `assertSafeRef`, `listBranches`, `resolveDefaultBranch`, `tryCurrentBranch`, `currentBranch`,
   `canonicalPath`, `resolveListedCommit`, `prefetchBranch`, `countPushDivergence`, `listRemotes`, `remoteNameOf`,
-  `snapshotWorktree`, `ignoredPaths`.
+  `snapshotWorktree`, `ignoredPaths`, `listBranchesForCleanup`, `deleteLocalBranch`,
+  `validateLocalBranchDeletion`, `repositoryCleanupKey`, `listGitWorktrees`, `listGitWorktreesSync`, `GitWorktreeEntry`, `refersToLocalBranch`.
 - **Allowed deps:** `persistence` (workspace + project lookup), `log`; `fs` (`resourceMeta`/`decodeText` —
   the one content classification, so a diff side's metadata cannot disagree with `fs.readFile`'s);
   `contracts` (`Git*`/`BranchList`/`ResourceMeta` types);

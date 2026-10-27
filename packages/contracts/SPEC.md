@@ -11,6 +11,16 @@ tags: [wire]
 
 ## Responsibility
 
+Local branch cleanup (protocol 93) exposes `git.listBranchesForCleanup` and `git.deleteBranch`.
+Catalog entries carry corresponding `workspaceIds` / `workspaceNames` for every referring record,
+so removal can distinguish its own soon-to-be-removed workspace from other references.
+The catalog carries the resolved default target, its oid, branch oids, unmerged counts, worktree
+occupancy and host-composed workspace protection. Delete carries the preview identity and requires
+`allowUnmerged: true` plus the exact branch name for unmerged commits. `workspace.remove` optionally
+deletes that local branch and returns `branchDeleted` / `retainedBranch` / `cleanupError` for partial
+completion. Older clients keep the Ack shape;
+new controls require the cleanup protocol. No remote deletion or checkout accompanies cleanup.
+
 The browser↔host wire spine: the single source of truth for the protocol. Types plus a small
 dependency-free runtime: the WS method/channel constants, protocol/feature versions, the small config
 default, narrow cross-ring guards, and the quit-confirmation rule both clients drive. The one package

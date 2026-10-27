@@ -32,7 +32,7 @@ test("Open in launches the detected editor detached at the worktree path", async
 
 	await expect.poll(() => existsSync(E2E_EDITOR_LOG)).toBe(true);
 	const invocation = readFileSync(E2E_EDITOR_LOG, "utf8").trim();
-	expect(invocation).toContain("/worktrees/sample-project/");
+	expect(invocation.replaceAll("\\", "/")).toContain("/worktrees/sample-project/");
 });
 
 test("Copy path copies the worktree's absolute path to the clipboard", async ({
@@ -48,7 +48,7 @@ test("Copy path copies the worktree's absolute path to the clipboard", async ({
 	await openWorkspaceMenu(row);
 	await page.getByTestId("workspace-copy-path").click();
 	const copied = await page.evaluate(() => navigator.clipboard.readText());
-	expect(copied).toContain("/worktrees/sample-project/");
+	expect(copied.replaceAll("\\", "/")).toContain("/worktrees/sample-project/");
 });
 
 test("a managed workspace can rename its display label inline without changing Git", async ({

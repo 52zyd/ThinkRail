@@ -41,7 +41,8 @@ bytes are** — the one byte-level classification every content read in the host
   prove (magic numbers for png/jpeg/gif/webp/avif/bmp/ico/pdf/zip/gzip/woff/woff2, plus `image/svg+xml` for
   text whose root element is `<svg>`, directly or behind an XML prolog — a prolog alone is not an
   image, and `application/vnd.git-lfs` for a text file of at most 1 KiB that is exactly the three-line pointer
-  `git lfs` itself writes — `version`, `oid sha256:`, `size`, in that order, nothing else, so no prose
+  `git lfs` itself writes — `version`, `oid sha256:`, `size`, in that order, with LF or CRLF line endings
+  and nothing else, so no prose
   that merely quotes a pointer can be mistaken for one — so a `.png` whose content is a pointer is
   reported as the pointer it is, not as an image that failed to decode); **text** is "no recognized binary magic number, no NUL byte in the first 8 KiB, and a strict
   UTF-8 decode" (a BOM is text; an SVG is text because `image/svg+xml` is inferred from text, never

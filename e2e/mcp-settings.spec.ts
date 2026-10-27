@@ -219,7 +219,9 @@ test("a stdio server added through the form connects in a chat, is disabled ther
 		await expect(dialog.getByTestId("mcp-run-review")).toHaveCount(0);
 		await dialog.getByTestId("mcp-form-value-value").fill(`\${HOME}`);
 		await dialog.getByTestId("mcp-add-submit").click();
-		await expect(dialog.getByTestId("mcp-run-item")).toContainText(STDIO_SERVER);
+		await expect(dialog.getByTestId("mcp-run-item")).toContainText(
+			JSON.stringify(STDIO_SERVER).slice(1, -1),
+		);
 		await dialog.getByTestId("mcp-add-confirm").click();
 		await expect(dialog).toBeHidden();
 		await expect(settings.getByTestId("mcp-feedback")).toHaveText(
@@ -387,8 +389,9 @@ test("a repository-defined server flags the chat, waits for approval and starts 
 		await row.getByTestId("mcp-server-action").click();
 		const dialog = page.getByTestId("mcp-approve-dialog");
 		await expect(dialog.getByTestId("mcp-approve-run")).toContainText(
-			`${STDIO_SERVER} --api-key ***`,
+			JSON.stringify(STDIO_SERVER).slice(1, -1),
 		);
+		await expect(dialog.getByTestId("mcp-approve-run")).toContainText("--api-key ***");
 		const env = dialog.getByTestId("mcp-approve-env");
 		await expect(env).toContainText(`FIXTURE_HOME=\${HOME}`);
 		await expect(env).toContainText("FIXTURE_SECRET=<literal value hidden>");

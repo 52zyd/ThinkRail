@@ -29,6 +29,7 @@ test("Skills renders existing controls as explicit switches without making rows 
 	const skillSwitch = page.locator('[data-testid="skill-toggle"]:not(:disabled)').first();
 	await expect(skillSwitch).toHaveRole("switch");
 	const before = await skillSwitch.getAttribute("aria-checked");
+	await page.mouse.move(0, 0);
 	await skillSwitch.hover();
 	await expect(page.getByRole("tooltip")).toHaveText(
 		before === "true" ? "On — turn off" : "Off — turn on",
@@ -97,7 +98,7 @@ test("a chat's Skills dialog names the project's Pi resources and grants them wi
 
 		const banner = page.getByTestId("skills-trust-all");
 		await expect(banner).toContainText("1 skill and its own Pi resources");
-		await expect(banner).toContainText("Trust loads its prompts.");
+		await expect(banner).toContainText("Trust loads its skills and prompts.");
 		await banner.getByRole("button", { name: "Trust project" }).click();
 		await expect(banner).toHaveCount(0);
 		expect(trustRequests.at(-1)).toMatchObject({ trusted: true, resources: true });

@@ -364,6 +364,9 @@ test("foreground: one Agent call runs a builtin scout and returns its report to 
 
 test("Agent advertises thinking suffix syntax without adding a separate thinking argument", () => {
 	const tool = parent.getToolDefinition("Agent");
+	expect(tool?.description).toContain("Omit model to inherit");
+	expect(tool?.description).toContain("empty or whitespace-only values also inherit");
+	expect(tool?.description).toContain("Prefer the full provider/id");
 	expect(tool?.description).toContain(":<thinking>");
 	expect(tool?.description).toContain("definition thinking overrides");
 	expect(JSON.stringify(tool?.parameters)).toContain("provider/id:thinking");
@@ -390,6 +393,53 @@ test("a per-call model runs an unpinned agent on a different model than the pare
 	const child = service.childrenOf(parent.sessionId)[0];
 	expect(child?.snapshot?.details.model).toBe("fauxb/fauxb");
 	await service.disposeChildrenOf(parent.sessionId);
+});
+
+test.each([
+	undefined,
+	"",
+	" ",
+	"\t\n",
+])("unspecified invocation model %j inherits the live parent through real Pi delegation", async (model) => {
+	const session = await makeSession();
+	try {
+		const liveModel = runtime.getModel("fauxreasoner", "fauxreasoner");
+		if (!liveModel) throw new Error("Reasoning model not registered");
+		await session.setModel(liveModel);
+		session.setThinkingLevel("high");
+		const priorModel = session.model;
+		const priorThinking = session.thinkingLevel;
+		const otherCalls = [fauxA.state.callCount, fauxB.state.callCount];
+		const liveCalls = fauxReasoner.state.callCount;
+		fauxReasoner.setResponses([
+			fauxAssistantMessage(
+				fauxToolCall("Agent", {
+					subagent_type: "scout",
+					task: "Report on the live parent model.",
+					...(model === undefined ? {} : { model }),
+				}),
+			),
+			fauxAssistantMessage("LIVE_MODEL_CHILD"),
+			fauxAssistantMessage("LIVE_MODEL_PARENT"),
+		]);
+		await session.prompt("Delegate after the parent model changed.");
+		const context = storedChildContext(session);
+		expect(context.model).toEqual({ provider: "fauxreasoner", modelId: "fauxreasoner" });
+		expect(context.thinkingLevel).toBe("high");
+		expect(service.childrenOf(session.sessionId)[0]?.snapshot?.details.model).toBe(
+			"fauxreasoner/fauxreasoner",
+		);
+		expect(JSON.stringify(session.messages)).toContain("LIVE_MODEL_CHILD");
+		expect(JSON.stringify(session.messages)).toContain("LIVE_MODEL_PARENT");
+		expect(fauxReasoner.state.callCount - liveCalls).toBe(3);
+		expect([fauxA.state.callCount, fauxB.state.callCount]).toEqual(otherCalls);
+		expect(session.model).toBe(priorModel);
+		expect(session.thinkingLevel).toBe(priorThinking);
+	} finally {
+		await service.disposeChildrenOf(session.sessionId);
+		liveParents.delete(session.sessionId);
+		session.dispose();
+	}
 });
 
 test.each([
@@ -460,29 +510,39 @@ test.each([
 });
 
 test.each([
-	false,
-	true,
-])("invalid suffix selection is a tool error before child creation (background %s)", async (background) => {
-	const callsBefore = fauxReasoner.state.callCount;
-	fauxA.setResponses([
-		fauxAssistantMessage(
-			fauxToolCall("Agent", {
-				subagent_type: "reviewer",
-				task: "Never start.",
-				model: "fauxreasoner/missing:xhigh",
-				run_in_background: background,
-			}),
-		),
-		fauxAssistantMessage("PARENT_RECOVERED_SELECTION"),
-	]);
-	await parent.prompt("Try an unavailable model with a suffix.");
-	const result = parent.messages.filter((message) => message.role === "toolResult").at(-1);
-	expect(result?.isError).toBe(true);
-	expect(lastToolResultText()).toContain('base "fauxreasoner/missing"');
-	expect(lastToolResultText()).toContain("not available in this session");
-	expect(lastToolResultText()).not.toContain("qualify");
-	expect(service.childrenOf(parent.sessionId)).toEqual([]);
-	expect(fauxReasoner.state.callCount).toBe(callsBefore);
+	["fauxreasoner/missing:xhigh", "not available in this session"],
+	["fauxreasoner/fauxreasoner:turbo", "supported thinking suffixes"],
+	["faux", 'ambiguous — qualify it as "provider/id"'],
+])("invalid selection %s is a tool error before foreground or background child creation", async (model, diagnostic) => {
+	const originalModel = parent.model;
+	const originalThinking = parent.thinkingLevel;
+	for (const background of [false, true]) {
+		const callsBefore = [fauxB.state.callCount, fauxReasoner.state.callCount];
+		fauxA.setResponses([
+			fauxAssistantMessage(
+				fauxToolCall("Agent", {
+					subagent_type: "reviewer",
+					task: "Never start.",
+					model,
+					run_in_background: background,
+				}),
+			),
+			fauxAssistantMessage("PARENT_RECOVERED_SELECTION"),
+		]);
+		await parent.prompt("Try an invalid model selection.");
+		const result = parent.messages.filter((message) => message.role === "toolResult").at(-1);
+		expect(result?.isError).toBe(true);
+		expect(lastToolResultText()).toContain(`requests model "${model}"`);
+		expect(lastToolResultText()).toContain(diagnostic);
+		if (model === "fauxreasoner/missing:xhigh") {
+			expect(lastToolResultText()).toContain('base "fauxreasoner/missing"');
+			expect(lastToolResultText()).not.toContain("qualify");
+		}
+		expect(service.childrenOf(parent.sessionId)).toEqual([]);
+		expect([fauxB.state.callCount, fauxReasoner.state.callCount]).toEqual(callsBefore);
+		expect(parent.model).toBe(originalModel);
+		expect(parent.thinkingLevel).toBe(originalThinking);
+	}
 });
 
 test("a definition-pinned model silently wins over the per-call model", async () => {

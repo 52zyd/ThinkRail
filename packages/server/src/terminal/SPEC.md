@@ -33,6 +33,10 @@ identities. A tab's shell outlives every client that looks at it; each frontend 
 
 ## Decisions
 
+Windows child-process inspection uses the system PowerShell path before PATH lookup. A repaired or
+hermetic PATH can omit PowerShell without making a running external process appear idle.
+Console-host infrastructure (`conhost.exe` / `OpenConsole.exe`) does not count as a shell job.
+
 - **Shell selection is terminal-local**, and Windows' choice is additionally user-configurable
   (`AppConfig.terminalWindowsShell`, `apps/web/src/panels/TerminalSettings.tsx`'s Windows-only picker;
   [[task-windows-default-terminal-shell]]). Precedence, highest first: an explicit `SHELL` env var always
@@ -71,6 +75,9 @@ identities. A tab's shell outlives every client that looks at it; each frontend 
   detected — this is a real but narrow gap, same accepted-limitation category as `shellBusy.test.ts`'s
   "an unanswerable platform reports not busy" case. A user who hits it can pick **Command Prompt (cmd)**
   and get the exact prior, fully-detectable behavior back.
+  Git Bash's MSYS process table supplies the parent relationship for its POSIX children, whose native
+  Windows parent can be a short-lived fork helper. The probe maps the shell's native PID through its
+  adjacent `ps.exe`; console infrastructure alone does not count as work.
 - **Not building a `listAvailableShells`-style host probe** to gray out an uninstalled pick in the Settings
   picker, unlike `editors`' `listAvailableEditors`: `auto` already gets the graceful substitution most users
   want, while a probe cannot prove ConPTY launchability and would duplicate the real spawn check. A failed
@@ -103,14 +110,17 @@ identities. A tab's shell outlives every client that looks at it; each frontend 
   type commands.
 - **Tracked-grid updates are change-only.** Each live entry tracks the grid applied at spawn or by the last
   successful resize. Attach and explicit resize advance that grid only when it changes, and failed calls do not
-  advance it. A reattach may still perform a *transient* redraw nudge (below) that leaves the tracked grid
+  advance it. An alternate-screen reattach may perform a *transient* redraw nudge (below) that leaves the tracked grid
   untouched. Even a same-grid resize can wake the shell through `SIGWINCH`; a redraw emitted
   after the attach snapshot can overwrite freshly replayed rows.
-- **Reattaching to an unchanged grid still nudges the foreground app** (`nudgePtyRedraw`, `ptyGrid.ts`):
+- **Reattaching to an unchanged grid nudges only an active alternate-screen app** (`nudgePtyRedraw`, `ptyGrid.ts`):
   `TIOCSWINSZ` to the same size is a kernel no-op — no `SIGWINCH`, so a full-screen alt-screen app (vim,
   htop, an interactive CLI) left running behind a tab that was switched away and back gets no signal to
   repaint, and the recorder never captured its alt-screen content to replay in its place (see below) — the
-  tab would otherwise show a frozen pre-alt-screen buffer. `attachTerminal`'s reattach branch resizes to
+  tab would otherwise show a frozen pre-alt-screen buffer. The recorder exposes its existing live
+  alternate-screen state even with a zero replay budget. Plain command lines need no forced repaint;
+  the deferred resize could consume the first character typed immediately after a Windows takeover.
+  `attachTerminal`'s reattach branch resizes to
   `cols - 1` only when the real resize above was a no-op, forcing a genuine `SIGWINCH`; the restoring
   resize back to `cols` is **deferred** (`NUDGE_RESTORE_DELAY_MS`, `setTimeout`), not fired back to back
   with the first. Two `pty.resize()` calls in the same tick are, from the child's perspective, a single
@@ -124,7 +134,7 @@ identities. A tab's shell outlives every client that looks at it; each frontend 
   interval, and it also checks that the tracked grid is still the one it captured: a real resize landing
   during the delay would otherwise be undone by the restore, leaving the PTY at the old size while the
   tracked grid says otherwise — and the change-only rule then makes retrying the new size a no-op. This is the same "redraw after the attach snapshot" class of race the bullet above already
-  accepts, deliberately triggered every reattach instead of only incidentally.
+  accepts, deliberately triggered for an active alternate screen instead of every plain-shell reattach.
 - **Ownership is the host's owner, not the browser page.** Any client may attach; consistent with `history`,
   `todos` and `templates`, which already assume a single-owner host. Consequence: shells survive a reload, a
   closed browser and a different browser.
@@ -183,7 +193,8 @@ identities. A tab's shell outlives every client that looks at it; each frontend 
 - `shellArgs.test.ts` — shell executable precedence across Unix and Windows plus platform-specific
   arguments; `auto`'s pwsh-then-powershell resolution via an injected `WhichFn`; every explicit preference
   is a literal pin regardless of what `which` reports; `ComSpec`/`COMSPEC` no longer influence the result.
-- `terminalManager.test.ts` — transactional durable reservation without spawn, catalog bounds, rejection
+  - `terminalManager.test.ts` uses an isolated HOME and Git Bash on Windows for its POSIX command fixtures.
+    It covers transactional durable reservation without spawn, catalog bounds, rejection
   of malformed write data and out-of-range or non-integer grid sizes on resize and attach, attach
   idempotency (incl. concurrent), takeover, displaced-client rejection, tab-list broadcast, close/busy,
   revive. Replay-persistence and natural-exit cases use bounded publisher-observed data/exit conditions as

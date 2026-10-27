@@ -11,6 +11,7 @@ type ModelRef = Pick<Model<string>, "provider" | "id">;
 type ModelMatch = { model: ModelRef } | { reason: "missing" | "ambiguous" };
 
 function matchModelRef(ref: string, available: readonly ModelRef[]): ModelMatch {
+	if (ref.trim().length === 0) return { reason: "missing" };
 	const slash = ref.indexOf("/");
 	if (slash > 0) {
 		const provider = ref.slice(0, slash);
@@ -95,7 +96,8 @@ export function toSpawnMapping(
 ): SpawnMapping {
 	let model: { provider: string; id: string } | undefined;
 	let thinkingLevel = definition.thinking;
-	const modelRef = definition.model ?? options.model;
+	const pinnedModel = definition.model?.trim() ? definition.model : undefined;
+	const modelRef = pinnedModel ?? (options.model?.trim() ? options.model : undefined);
 	if (modelRef !== undefined) {
 		let lookupRef = modelRef;
 		let match = matchModelRef(lookupRef, options.availableModels);
@@ -107,7 +109,7 @@ export function toSpawnMapping(
 			thinkingLevel ??= suffix;
 		}
 		if ("reason" in match) {
-			const selection = definition.model !== undefined ? "pins" : "requests";
+			const selection = pinnedModel !== undefined ? "pins" : "requests";
 			const reason =
 				match.reason === "ambiguous"
 					? 'is ambiguous — qualify it as "provider/id"'

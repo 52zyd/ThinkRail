@@ -4,7 +4,7 @@ export interface LfsPointer {
 }
 
 const POINTER =
-	/^version https:\/\/git-lfs\.github\.com\/spec\/v1\noid sha256:([0-9a-f]{64})\nsize (\d{1,15})\n$/;
+	/^version https:\/\/git-lfs\.github\.com\/spec\/v1\r?\noid sha256:([0-9a-f]{64})\r?\nsize (\d{1,15})\r?\n$/;
 
 export function parseLfsPointer(text: string): LfsPointer | null {
 	const match = POINTER.exec(text);

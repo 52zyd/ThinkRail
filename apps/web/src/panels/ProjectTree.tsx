@@ -75,8 +75,10 @@ import {
 } from "../store";
 import { errorText, getTransport } from "../transport";
 import { AddProjectMenu } from "./AddProjectMenu";
+import { supportsBranchCleanup } from "./branchCleanup";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { ExistingWorktreeDialog } from "./ExistingWorktreeDialog";
+import { LocalBranchesDialog } from "./LocalBranchesDialog";
 import { NewWorkspaceDialog } from "./NewWorkspaceDialog";
 import { RemoveWorkspaceDialog } from "./RemoveWorkspaceDialog";
 import {
@@ -143,7 +145,14 @@ export function ProjectTree() {
 	const focusProjectNameOrAdd = useCallback((projectId?: string) => {
 		requestAnimationFrame(() => {
 			const projectButton = projectId ? projectNameButtonsRef.current.get(projectId) : undefined;
-			(projectButton ?? addProjectButtonRef.current)?.focus();
+			const liveButton = projectButton?.isConnected
+				? projectButton
+				: projectId
+					? document.querySelector<HTMLButtonElement>(
+							`button[data-project-id="${CSS.escape(projectId)}"]`,
+						)
+					: null;
+			(liveButton ?? addProjectButtonRef.current)?.focus();
 		});
 	}, []);
 
@@ -350,6 +359,7 @@ export function ProjectTree() {
 											onKeepActive={() => unsettleWorkspace(ws.id)}
 											onMarkRead={() => markWorkspaceRead(ws.id)}
 											onMarkUnread={() => markWorkspaceUnread(ws.id)}
+											onRemovedFocus={() => focusProjectNameOrAdd(project.id)}
 										/>
 									)}
 								/>
@@ -530,6 +540,8 @@ function ProjectRow({
 	const Folder = isSelected ? RiFolderFill : RiFolderLine;
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [confirmOpen, setConfirmOpen] = useState(false);
+	const [branchesOpen, setBranchesOpen] = useState(false);
+	const cleanupSupported = useAppStore((s) => supportsBranchCleanup(s.protocolVersion));
 	const openingDialogRef = useRef(false);
 	const closeConfirmedRef = useRef(false);
 	const {
@@ -552,6 +564,16 @@ function ProjectRow({
 		openingDialogRef.current = true;
 		setMenuOpen(false);
 		requestAnimationFrame(openDialog);
+	};
+	const openActionsMenu = (target: HTMLElement) => {
+		const rect = target.getBoundingClientRect();
+		target.dispatchEvent(
+			new MouseEvent("contextmenu", {
+				bubbles: true,
+				clientX: rect.left,
+				clientY: rect.bottom,
+			}),
+		);
 	};
 	const row = (
 		<div
@@ -596,6 +618,7 @@ function ProjectRow({
 					ref={onRegisterNameButton}
 					type="button"
 					data-testid="project-name"
+					data-project-id={project.id}
 					onClick={onSelect}
 					className="flex min-w-0 flex-1 items-center gap-4 text-left"
 				>
@@ -612,6 +635,18 @@ function ProjectRow({
 					{workspaceCount}
 				</span>
 			)}
+			<IconTooltip label={t("panels.projectTree.projectActions", { name: project.name })}>
+				<Button
+					variant="ghost"
+					size="icon"
+					className="size-panel-row shrink-0"
+					data-testid="project-menu"
+					aria-label={t("panels.projectTree.projectActions", { name: project.name })}
+					onClick={(event) => openActionsMenu(event.currentTarget)}
+				>
+					<MoreVertical className="size-14" />
+				</Button>
+			</IconTooltip>
 			<IconTooltip label={createWorkspaceLabel}>
 				<Button
 					variant="ghost"
@@ -634,14 +669,7 @@ function ProjectRow({
 					onKeyDown={(event) => {
 						if (event.key !== "ContextMenu" && !(event.shiftKey && event.key === "F10")) return;
 						event.preventDefault();
-						const rect = event.currentTarget.getBoundingClientRect();
-						event.currentTarget.dispatchEvent(
-							new MouseEvent("contextmenu", {
-								bubbles: true,
-								clientX: rect.left,
-								clientY: rect.bottom,
-							}),
-						);
+						openActionsMenu(event.currentTarget);
 					}}
 				>
 					{row}
@@ -675,6 +703,18 @@ function ProjectRow({
 						{t("panels.projectTree.openExistingWorktree")}
 					</ContextMenuItem>
 					<ContextMenuSeparator />
+					{cleanupSupported ? (
+						<ContextMenuItem
+							data-testid="project-menu-manage-branches"
+							onSelect={(event) => {
+								event.preventDefault();
+								openDialogAfterMenu(() => setBranchesOpen(true));
+							}}
+						>
+							<GitBranch />
+							{t("panels.branchCleanup.title")}
+						</ContextMenuItem>
+					) : null}
 					{canRename ? (
 						<ContextMenuItem
 							data-testid="project-menu-rename"
@@ -699,6 +739,14 @@ function ProjectRow({
 					</ContextMenuItem>
 				</ContextMenuContent>
 			</ContextMenu>
+			{cleanupSupported ? (
+				<LocalBranchesDialog
+					projectId={project.id}
+					open={branchesOpen}
+					onOpenChange={setBranchesOpen}
+					onClosedAutoFocus={onRestoreFocus}
+				/>
+			) : null}
 			<ConfirmDialog
 				open={confirmOpen}
 				onOpenChange={setConfirmOpen}
@@ -739,6 +787,7 @@ function WorkspaceRow({
 	onKeepActive,
 	onMarkRead,
 	onMarkUnread,
+	onRemovedFocus,
 }: {
 	workspace: Workspace;
 	settled: SettledReason | null;
@@ -759,6 +808,7 @@ function WorkspaceRow({
 	onKeepActive: () => void;
 	onMarkRead: () => void;
 	onMarkUnread: () => void;
+	onRemovedFocus: () => void;
 }) {
 	const t = useT();
 	const isDefault = isDefaultWorkspace(workspace);
@@ -783,6 +833,7 @@ function WorkspaceRow({
 		event.preventDefault();
 		setMenuOpen(true);
 	};
+	const workspaceMenuRef = useRef<HTMLButtonElement>(null);
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const {
 		editing,
@@ -925,6 +976,7 @@ function WorkspaceRow({
 					{hoverAction}
 					<DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
 						<DropdownMenuTrigger
+							ref={workspaceMenuRef}
 							data-testid="workspace-menu"
 							aria-label={t("panels.projectTree.workspaceActions", { name: displayName })}
 							className={HOVER_CONTROL_CLASS}
@@ -1027,6 +1079,10 @@ function WorkspaceRow({
 			{!isDefault && (
 				<RemoveWorkspaceDialog
 					workspace={workspace}
+					onClosedAutoFocus={() => {
+						if (workspaceMenuRef.current?.isConnected) workspaceMenuRef.current.focus();
+						else onRemovedFocus();
+					}}
 					open={confirmOpen}
 					onOpenChange={setConfirmOpen}
 				/>

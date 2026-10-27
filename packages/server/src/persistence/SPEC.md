@@ -23,6 +23,9 @@ file an older host wrote — heals on read and is persisted by the next save of 
 and a value that is not absolute on this host stays as stored. Saves do not normalize: the producers resolve
 at their own doors, so an object a create call returns never differs from what it stored.
 
+Cleanup callers use `loadWorkspaces({ strict: true })`: only a missing registry means no records;
+unreadable, malformed or invalid workspace records throw instead of permitting destructive cleanup.
+
 Session metadata writes are complete-copy temp-file replacements. Lifecycle persists only facts a transcript
 cannot prove—`agent_settled` outcome and explicit Stop—keyed to the active run/completion ids; stale records
 never apply to a newer turn. Loads report each file as loaded, missing, or set aside. Unless both files

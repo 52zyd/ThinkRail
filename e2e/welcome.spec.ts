@@ -159,7 +159,9 @@ test("the Welcome trust notice names a project's Pi resources, grants them, and 
 		const notice = page.getByTestId("project-trust-notice");
 		await expect(notice).toHaveAttribute("data-state", "untrusted");
 		await expect(notice).toContainText("1 skill and its own Pi resources");
-		await expect(page.getByTestId("project-trust-enables")).toHaveText("Trust loads its prompts.");
+		await expect(page.getByTestId("project-trust-enables")).toHaveText(
+			"Trust loads its skills and prompts.",
+		);
 		await expect(page.getByTestId("project-untrust-button")).toHaveCount(0);
 
 		await page.getByTestId("project-trust-button").click();

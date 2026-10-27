@@ -11,6 +11,12 @@ tags: [pi]
 
 ## Responsibility
 
+Workspace removal can hold session admission closed with `withWorkspaceSessionsClosed(id, operation)`.
+It stops parent sessions and children without deleting transcripts, runs the host's reclamation, and
+reopens admission on failure. `purgeWorkspaceSessions(id, cwd)` is the separate final history deletion;
+history-read failures reject rather than claiming a completed purge. The existing
+`removeWorkspaceSessions` composes both for its other callers.
+
 The in-process `pi` engine: a current shared model/auth runtime generation for pre-session work and future
 chats, the lifecycle of `AgentSession`s (one per chat tab, rooted in a workspace's worktree and retaining the
 runtime generation they were created with), Pi resource/skill loading (including portable

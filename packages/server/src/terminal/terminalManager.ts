@@ -297,7 +297,7 @@ export function attachTerminal(
 						rows: options.rows,
 					})
 				: false;
-		if (!resized) {
+		if (!resized && existing.recorder.alternateScreen) {
 			nudgePtyRedraw(existing.pty, existing.grid, {
 				isStillLive: () => terminals.get(existingId) === existing,
 			});

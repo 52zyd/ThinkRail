@@ -11,11 +11,24 @@ tags: [ui]
 
 ## Responsibility
 
+Protocol-93 local branch cleanup is available in the project menu and the workspace removal dialog.
+The branch manager shows the host's default target, unmerged counts and protected/occupied reasons;
+unmerged deletion requires the exact branch name. Removal defaults to preserving the branch, blocks
+dirty managed worktrees, waits for completion and reports a retained branch on partial completion.
+External worktrees are detached only; old hosts retain their existing removal dialog and no cleanup
+controls. All copy is localized, and dialogs preserve mobile sizing and keyboard/focus behavior.
+
 Providers includes a protocol-gated compatible-service group with CRUD, explicit protocol selection,
 manual model declarations and opt-in `/models` discovery. Keys stay in transient password inputs;
 blank edits preserve them and an explicit no-key switch clears them. Discovery failures retain drafts.
 Associated chats must close before routing changes/removal. Forms reuse owned primitives and semantic
 tokens. The UI never infers model capabilities or represents absent custom prices as free service.
+The compatible group starts with a highlighted recommendation preset and a user-initiated external
+website link. Configure opens the same form with editable name/base URL, Chat Completions, an empty
+password input and no models selected. Opening it performs no discovery or persistence. Preset,
+ordinary-new and existing-service forms have distinct lifetimes; every preset save creates an independent
+host-owned service, never merging by name/URL or changing the current/default model. The preset shares
+the group's protocol gate. Website navigation is separate from the existing referral footer.
 
 The layout-agnostic, store-driven feature views. A panel fills its container and never knows its
 arrangement (so the mobile shell is an additive layer, not a rewrite).
@@ -41,7 +54,9 @@ treatment.
   line up on one vertical axis (both sit at the row's `pr-xs` right edge). The Create workspace `+` carries a
   tooltip and accessible name naming the shell's `Mod+N` chord and its `Mod+Alt+N` browser alias through `lib`'s
   `platformShortcutLabel` (see `submodule-web-shell` global chords); the context-menu item stays plain.
-  Long names truncate before the count/action; there is deliberately **no visible Close or overflow icon**.
+  Long names truncate before the count/actions. An always-visible project-menu button beside `+`
+  opens the same context menu, making branch management findable without knowing the right-click
+  gesture. Right-click, long-press and keyboard context-menu gestures remain supported.
   Hover highlights the full row and the highlight remains while its **project context menu** is open.
   Right-click opens that PR-#167-styled menu at the pointer without selecting/navigating; a scroll-cancelled
   ~700ms long press is its touch equivalent. With a project-name button focused, the standard Context Menu
@@ -121,9 +136,10 @@ treatment.
   client: the row returns to the prior host-owned label until every surface adopts the full-snapshot
   `workspace.updated` push; rejection keeps that snapshot and raises an error toast. The Git branch and
   worktree folder never change. Remove is styled destructive
-  and opens a centered `ConfirmDialog`; confirming fires `workspace.remove` and lets every client react to the
-  host's `workspace.removed` push via the store's `applyWorkspaceRemoved`; a rejected request (no event will
-  come) surfaces an error toast, leaving the row in place. Each **workspace row** is **two-line**: the display
+  and opens a centered confirmation; v93 waits for `workspace.remove`, keeps failures in the dialog,
+  and shows a retained-branch toast on partial completion. Older hosts keep the legacy confirmation.
+  Every client reacts to the host's `workspace.removed` push via `applyWorkspaceRemoved`, never an
+  optimistic deletion. Each **workspace row** is **two-line**: the display
   `name` on top with the git **branch on a second line beneath it** (muted, monospace), rendered only when
   it differs from the name (so pristine/legacy `workspace-N` rows stay a single compact line) — the display
   name is decoupled from the git branch (see [[submodule-server-workspaces]]).

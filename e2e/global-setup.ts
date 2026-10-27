@@ -1,7 +1,6 @@
-import { chmodSync, copyFileSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { FullConfig } from "@playwright/test";
-import { removeTree } from "@thinkrail/shared/removeTree";
 import { seedAgentDefinitionFixtures } from "./fixtures/agents";
 import {
 	CentralSetupError,
@@ -13,7 +12,8 @@ import {
 	waitForCentralTarget,
 	writeE2eAgentSettings,
 } from "./fixtures/centralAgent";
-import { writeFakeGh, writeHermeticE2eShell } from "./fixtures/executables";
+import { removeFixtureTree } from "./fixtures/cleanup";
+import { writeFakeGh, writeFixtureCommand, writeHermeticE2eShell } from "./fixtures/executables";
 import {
 	E2E_CENTRAL_BAD_EXTENSION_SOURCE,
 	E2E_CENTRAL_EXTENSION_SOURCE,
@@ -55,7 +55,7 @@ export default function globalSetup(config?: FullConfig): void | Promise<void> {
 	const centralMode = isRealCentralE2e();
 	try {
 		const globalCentralArtifact = centralMode ? findGlobalCentralArtifact() : undefined;
-		rmSync(E2E_DATA_DIR, { recursive: true, force: true });
+		removeFixtureTree(E2E_DATA_DIR);
 		mkdirSync(E2E_DATA_DIR, { recursive: true });
 		writeFileSync(join(E2E_DATA_DIR, "config.json"), JSON.stringify(ENGLISH_CONFIG));
 		writeFileSync(
@@ -66,12 +66,12 @@ export default function globalSetup(config?: FullConfig): void | Promise<void> {
 		writeFileSync(join(E2E_HOME_DIR, ".zshrc"), "# ThinkRail e2e isolated shell\n");
 
 		for (const rc of [".zshrc", ".bashrc"]) writeFileSync(join(E2E_HOME_DIR, rc), "");
+		if (process.platform === "win32")
+			writeFileSync(join(E2E_HOME_DIR, ".bashrc"), 'export PATH="$PATH:/usr/bin:/bin"\nPS1="$ "\n');
 
 		mkdirSync(E2E_FAKE_BIN_DIR, { recursive: true });
-		for (const command of ["central", "code", "github-ssh"]) {
-			const target = join(E2E_FAKE_BIN_DIR, command);
-			copyFileSync(new URL(`./fixtures/bin/${command}`, import.meta.url), target);
-			chmodSync(target, 0o755);
+		for (const command of ["central", "code", "github-ssh"] as const) {
+			writeFixtureCommand(E2E_FAKE_BIN_DIR, command);
 		}
 		writeHermeticE2eShell(E2E_FAKE_BIN_DIR, process.env.SHELL ?? "/bin/bash");
 		writeFakeGh(E2E_FAKE_BIN_DIR, E2E_GH_SCENARIO, E2E_GH_LOG);
@@ -101,7 +101,7 @@ export default function globalSetup(config?: FullConfig): void | Promise<void> {
 		writeFileSync(E2E_PICK_DIR_POINTER, E2E_FIXTURE_REPO);
 	} catch (error) {
 		if (!centralMode) throw error;
-		removeTree(E2E_DATA_DIR);
+		removeFixtureTree(E2E_DATA_DIR);
 		throw centralSetupFailure(error);
 	}
 
@@ -130,7 +130,7 @@ export default function globalSetup(config?: FullConfig): void | Promise<void> {
 			}
 		})
 		.catch((error: unknown) => {
-			removeTree(E2E_DATA_DIR);
+			removeFixtureTree(E2E_DATA_DIR);
 			throw centralSetupFailure(error);
 		});
 }

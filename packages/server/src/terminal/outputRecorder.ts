@@ -18,6 +18,7 @@ const PRIVATE_MODE_RE = new RegExp(`${ESC}\\[\\?([0-9;]+)([hl])`, "g");
 const PARTIAL_MODE_RE = new RegExp(`${ESC}(?:\\[\\??[0-9;]{0,16})?$`);
 
 export interface OutputRecorder {
+	readonly alternateScreen: boolean;
 	push(chunk: string): void;
 	snapshot(): string;
 	restore(recorded: string): void;
@@ -51,7 +52,7 @@ export function createOutputRecorder(options: OutputRecorderOptions = {}): Outpu
 	};
 
 	const append = (text: string): void => {
-		if (text === "") return;
+		if (maxChars <= 0 || text === "") return;
 		recorded += text;
 		if (recorded.length > maxChars) {
 			recorded = trimToLineStart(recorded, recorded.length - maxChars);
@@ -73,8 +74,11 @@ export function createOutputRecorder(options: OutputRecorderOptions = {}): Outpu
 	};
 
 	return {
+		get alternateScreen() {
+			return inAltBuffer;
+		},
 		push(chunk) {
-			if (disposed || maxChars <= 0 || chunk === "") return;
+			if (disposed || chunk === "") return;
 			const text = carry + chunk;
 			carry = "";
 			const partial = PARTIAL_MODE_RE.exec(text);
@@ -105,6 +109,7 @@ export function createOutputRecorder(options: OutputRecorderOptions = {}): Outpu
 		},
 		dispose() {
 			disposed = true;
+			inAltBuffer = false;
 			recorded = "";
 			carry = "";
 			modes.clear();

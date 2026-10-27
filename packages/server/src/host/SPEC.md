@@ -15,6 +15,18 @@ channel fan-out, and the process-boot wrapper both launchers share.
 
 ## Boundary
 
+Protocol v93 branch cleanup composes Git previews with all workspace references in the same
+repository, including records owned by closed projects. Deletions and workspace removals share a repository lock, revalidate preview identities,
+and fail closed on unreadable state. Removal closes chats, children and terminals before its second
+dirty-file check, reclaims only managed worktrees, then optionally deletes the local branch and
+purges application records. A reclamation failure keeps records/history for retry; a later branch
+failure returns partial completion with the retained branch. External worktrees are detached only.
+An optional branch-delete request whose workspace was already removed rejects as stale rather than
+claiming that the branch was deleted; ordinary repeated removals remain idempotent.
+Older clients cannot invoke cleanup methods or branch-delete removal parameters.
+Workspace branch/base references share Git's local-ref matcher, including `heads/` and `refs/heads/`
+spellings and Windows case aliases, so direct requests cannot evade record protection.
+
 The four protocol-v91 `provider.compatible*` handlers delegate to agent's provider-settings adapter;
 the existing `provider.changed` broadcast invalidates both model and configuration reads. Responses
 contain only allowlisted configuration, model declarations and key-presence; credential values stay
@@ -380,22 +392,15 @@ write-only. Closed failure codes let the UI translate recovery text without forw
   - A target the agent never names stays unnamed; there is no fallback.
   - The **workspace-archive teardown** — the other composition of `agent` + `terminal` + `workspaces` only
     the host may make. `workspace.remove` **rejects a `kind: "default"` workspace loudly, before any
-    side-effect** (the record's `worktreePath` is the project folder — the reclaim's `rm -rf` fallback
-    must never see it; the UI hides Remove, this guard is for buggy/rogue clients). Otherwise it
-    reaps *everything* rooted in the worktree (for a user-owned `kind: "external"` one, everything except
-    the checkout itself) but is **non-blocking**:
-    it does the fast part synchronously — `forgetWorkspace` (drop the record → gone from `workspace.list`
-    immediately) → `evictSpecIndex` (drop the spec cache) → `closeWorkspaceTerminals` (kill its PTYs) —
-    **acks**, then runs the slow reclamation in the **background** (`archiveTeardown`, fire-and-forget):
-    `removeWorkspaceSessions` (abort a streaming turn, dispose the live sessions, **and** purge pi's
-    on-disk transcripts for the cwd) → `reclaimWorktree` (`git worktree remove`; a hard no-op for an
-    external one). So the user never waits
-    for the git subprocess + session abort. **Ordering holds:** terminals (sync) and sessions (bg, before
-    the reclaim) are down before the dir is deleted, since they hold it as cwd, and the workspace's
-    todo-mutation queue is settled (`settleChangeArtifacts`) between the two — an in-flight reconcile's
-    plan/baseline writes land before the reclaim that sweeps them, never after it into a resurrected dir. Best-effort by contract —
-    a failed background teardown is warn-logged, never thrown into the void (nothing awaits it). **Archive keeps the branch but not the chat:** the git branch stays (code is
-    recoverable), yet chat history is purged with the worktree — a deliberate scope choice, not a leak.
+    side-effect**. Removal is awaited under the same repository lock as branch deletion: check the
+    path, dirty files and optional branch identity → hold session admission closed and await parent,
+    child and resource disposal → close terminals and settle artifact writes → recheck identity,
+    dirtiness and optional deletion → reclaim through non-force `git worktree remove` → optionally
+    delete the local branch → purge history and drop records/caches. A failed reclaim preserves the
+    workspace record and history for retry. A failed optional branch deletion after reclaim returns
+    `branchDeleted: false`, `retainedBranch` and `cleanupError`, rather than pretending full success.
+    External workspaces are unlinked only: their checkout and branch remain untouched. Archive without
+    optional branch deletion keeps the branch; successful reclamation still purges the workspace chat.
 - **Change mutations are serialized per workspace, on their own chain** (`reviewLock.ts`'s
   `createKeyedLock` mints both): `change.revert`/`change.undo` run under **`withChangeLock(workspaceId)`**
   so two reverts cannot interleave their load→verify→write passes, while reviews and changes —

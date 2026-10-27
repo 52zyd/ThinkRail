@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSyn
 import { join } from "node:path";
 import type { Locator, Page } from "@playwright/test";
 import { expect } from "@playwright/test";
-import type { SessionSummary, Workspace } from "@thinkrail/contracts";
+import type { Workspace } from "@thinkrail/contracts";
 import { removeTree } from "@thinkrail/shared/removeTree";
 import {
 	isRealCentralE2e,
@@ -25,7 +25,7 @@ import {
 	E2E_PLAIN_DIR,
 } from "./paths";
 import { fixtureRepoHealthy, seedFixtureRepo } from "./repo";
-import { E2eWire } from "./wire";
+import { disposeFixtureResources } from "./resources";
 
 export const PHONE_VIEWPORT = { width: 390, height: 780 } as const;
 
@@ -132,27 +132,14 @@ function loadPersistedWorkspaces(): Workspace[] {
 async function disposeLiveSessions(page: Page): Promise<void> {
 	const workspaces = loadPersistedWorkspaces();
 	if (workspaces.length === 0) return;
-	const health = await page.request.get("/health");
+	const health = await page.request.get("/health", { maxRetries: 2 });
 	const hostUrl = new URL(health.url());
 	health.dispose();
 	const port = Number(hostUrl.port) || (hostUrl.protocol === "https:" ? 443 : 80);
-	const wire = await E2eWire.connect(port);
-	try {
-		for (const workspace of workspaces) {
-			const sessions: SessionSummary[] = await wire.request(
-				"session.list",
-				{ workspaceId: workspace.id },
-				30_000,
-			);
-			for (const session of sessions) {
-				if (session.live) {
-					await wire.request("session.dispose", { sessionId: session.sessionId }, 30_000);
-				}
-			}
-		}
-	} finally {
-		wire.close();
-	}
+	await disposeFixtureResources(
+		port,
+		workspaces.map((workspace) => workspace.id),
+	);
 }
 
 export async function createWorkspaceViaDialog(page: Page): Promise<Workspace> {
@@ -165,6 +152,7 @@ export async function createWorkspaceViaDialog(page: Page): Promise<Workspace> {
 	await page.getByTestId("create-workspace").click();
 	await expect(dialog).toBeHidden();
 	await expect(page.locator('[data-testid="editor-tab"][data-kind="chat"]').first()).toBeVisible();
+	await expect(page.getByTestId("chat-view")).toBeVisible();
 	const created = loadPersistedWorkspaces().find((w) => !before.has(w.id) && w.kind !== "default");
 	if (!created) throw new Error("Workspace was not persisted after creation");
 	return created;
@@ -394,6 +382,7 @@ export function pseudoBackgroundColor(element: Locator, pseudo: string): Promise
 
 export async function waitTerminalReady(page: Page): Promise<void> {
 	await expect(visibleTerminal(page)).toHaveAttribute("data-ready", "true");
+	await expect(visibleTerminal(page)).toHaveAttribute("data-detached", "false");
 }
 
 export async function openTerminal(page: Page): Promise<void> {
@@ -405,7 +394,10 @@ export async function openTerminal(page: Page): Promise<void> {
 }
 
 export async function runInTerminal(page: Page, command: string): Promise<void> {
-	await visibleTerminal(page).locator(".xterm-helper-textarea").focus();
+	await waitTerminalReady(page);
+	const input = visibleTerminal(page).locator(".xterm-helper-textarea");
+	await input.focus();
+	await expect(input).toBeFocused();
 	await page.keyboard.type(command);
 	await page.keyboard.press("Enter");
 }

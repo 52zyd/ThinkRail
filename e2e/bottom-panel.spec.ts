@@ -594,6 +594,8 @@ test("closing a final bottom resource retains its frame groups until explicit re
 	await expect(bottomGroups(page)).toHaveCount(2);
 
 	await page.getByTestId("terminal-tab-close").click();
+	const confirmClose = page.getByRole("button", { name: "Close anyway", exact: true });
+	if (await confirmClose.isVisible()) await confirmClose.click();
 	await expect(bottomGroups(page)).toHaveCount(2);
 	await expect(page.getByTestId("bottom-new-terminal")).toHaveCount(2);
 	await bottomGroups(page).first().getByTestId("remove-layout-group").click();

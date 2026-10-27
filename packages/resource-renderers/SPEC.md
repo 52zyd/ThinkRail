@@ -277,6 +277,7 @@ whatever its extension) above the code renderer and shows a card — "Stored in 
 `git lfs pull` hint — in the view and one card per side in the diff, because three lines of pointer
 protocol in a Monaco editor explain nothing about why a `.png` has no image; Source stays one toggle
 away, and the renderer places no anchors, so a pointer's threads live in the unplaced strip.
+Pointer parsing accepts LF and Windows CRLF without changing source bytes or their identity.
 `RenderedDiff` keeps its worker-isolated htmldiff merge,
 loading/error states, and token styling (a text change keeps the previous merge on screen until the next one
 arrives, so a live refresh neither flashes the loading placeholder nor remounts the document; finished

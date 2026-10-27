@@ -178,7 +178,8 @@ The subagent works autonomously and non-interactively: give it one complete, sel
 (everything it must know goes in the task text) and it returns a final report. Issue several Agent
 calls in ONE message to run subagents in parallel; sequence dependent steps yourself across turns.
 Set run_in_background for long tasks — you get the session id immediately, a completion message
-arrives when it finishes, and get_subagent_result fetches the result on demand. Set model to choose
+arrives when it finishes, and get_subagent_result fetches the result on demand. Omit model to inherit
+the parent's model; empty or whitespace-only values also inherit. Prefer the full provider/id to choose
 an available model for an unpinned agent; a definition's pinned model always wins, ignoring the
 invocation model and its suffix. A model reference with no whole-reference match may end in
 :<thinking> (${THINKING_LEVELS.join(", ")}). Whole-reference matches keep their meaning;
@@ -199,7 +200,7 @@ ${known}`,
 					model: Type.Optional(
 						Type.String({
 							description:
-								'Available model for an unpinned agent: "provider/id" or "provider/id:thinking". Whole-reference matches win; a definition pin ignores this value, and definition thinking overrides a suffix.',
+								'Omit to inherit the parent model. To select an available model for an unpinned agent, use "provider/id" or "provider/id:thinking". Whole-reference matches win; a definition pin ignores this value, and definition thinking overrides a suffix.',
 						}),
 					),
 					run_in_background: Type.Optional(

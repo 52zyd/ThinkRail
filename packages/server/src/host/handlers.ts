@@ -13,6 +13,7 @@ import type {
 	WsResult,
 } from "@thinkrail/contracts";
 import {
+	BRANCH_CLEANUP_PROTOCOL_VERSION,
 	BRANCH_STATUS_PROTOCOL_VERSION,
 	isControlMessage,
 	WORKSPACE_SETTLE_PROTOCOL_VERSION,
@@ -65,7 +66,6 @@ import {
 	removeCompatibleProvider,
 	removeQueuedSession,
 	removeSession,
-	removeWorkspaceSessions,
 	renameSession,
 	replyMcpProbe,
 	resolveExtUi,
@@ -94,7 +94,7 @@ import {
 	updateJbcentral,
 } from "../auth";
 import { findBranchReviewOutcome, providerFromRemoteUrl } from "../branch-review";
-import { forgetWorkspaceChanges, revertChange, undoChange } from "../changes";
+import { revertChange, undoChange } from "../changes";
 import { selectDirectory } from "../dialog";
 import { listAvailableEditors, openEditor, revealInFileManager } from "../editors";
 import { listExtensionCatalog } from "../extensions";
@@ -152,14 +152,13 @@ import {
 	markCommentsSent,
 	markFileDone,
 	REVIEW_LEVEL_KEY,
-	removeWorkspaceReviews,
 	reviewSessionKey,
 	rollbackSend,
 	sendableComments,
 	updateComment,
 } from "../reviews";
 import { getConfig, noteRecentModel, updateConfig } from "../settings";
-import { evictSpecIndex, projectHasSpecs, specGraph } from "../spec";
+import { projectHasSpecs, specGraph } from "../spec";
 import {
 	deleteTemplate,
 	getTemplate,
@@ -170,7 +169,6 @@ import {
 import {
 	attachTerminal,
 	closeTerminalTab,
-	closeWorkspaceTerminals,
 	listTerminals,
 	reserveTerminal,
 	resizeTerminal,
@@ -186,23 +184,20 @@ import {
 	removeTodo,
 	requestTodoFix,
 	rollbackTodoFix,
-	settleChangeArtifacts,
 	type TodoReviewRecord,
 	updateTodo,
 } from "../todos";
-import { forgetWorkspaceTurns, listTurns } from "../turns";
-import { ensureWatch, stopWatch } from "../watch";
+import { listTurns } from "../turns";
+import { ensureWatch } from "../watch";
 import {
 	createWorkspace,
 	ensureWorkspaceScratchDir,
-	forgetWorkspace,
 	getWorkspace,
 	listAllWorkspaceRecords,
 	listExistingWorktrees,
 	listWorkspaceRecords,
 	listWorkspaces,
 	openExistingWorktree,
-	reclaimWorktree,
 	recordWorkspaceActivity,
 	refreshUserOwnedWorkspace,
 	renameWorkspace,
@@ -216,6 +211,7 @@ import {
 	workspaceDiffStats,
 } from "../workspaces";
 import { ackSend } from "./ackSend";
+import { branchCleanupList, deleteBranch, removeWorkspaceSafely } from "./branchCleanup";
 import { nudgeBaseRefWorkspaces } from "./fsNudge";
 import { buildHistoryScope } from "./historyScope";
 import { provisionInitialTerminal } from "./initialTerminal";
@@ -264,15 +260,6 @@ type WsHandler<M extends WsMethodName> = (
 type WsHandlers = {
 	[M in WsMethodName]: WsHandler<M>;
 };
-async function archiveTeardown(ws: Workspace): Promise<void> {
-	try {
-		await removeWorkspaceSessions(ws.id, ws.worktreePath);
-		await settleChangeArtifacts(ws.id);
-		reclaimWorktree(ws);
-	} catch {
-		log.warn(`workspace archive teardown failed for ${ws.id}`);
-	}
-}
 async function sendUserMessage(
 	text: string,
 	clientKey: string,
@@ -549,19 +536,9 @@ const handlers: WsHandlers = {
 	"workspace.markRead": async (params) => ({
 		records: await markWorkspaceRead(sessionStateWorkspace(getWorkspace(params.id))),
 	}),
-	"workspace.remove": (params) => {
-		const id = params.id;
-		const ws = forgetWorkspace(id);
-		if (ws) {
-			evictSpecIndex(ws.id);
-			removeWorkspaceReviews(ws.id);
-			forgetWorkspaceChanges(ws.id);
-			forgetWorkspaceTurns(ws.id);
-			stopWatch(ws.id);
-			closeWorkspaceTerminals(ws.id);
-			void archiveTeardown(ws);
-		}
-		return { ok: true } as const;
+	"workspace.remove": (params, ctx) => {
+		if (params.deleteBranch) requireBranchCleanup(ctx);
+		return removeWorkspaceSafely(params);
 	},
 	"workspace.diffStats": (params) => workspaceDiffStats(params.id),
 	"workspace.openIn": (p) => {
@@ -574,6 +551,14 @@ const handlers: WsHandlers = {
 	},
 	"editor.list": () => listAvailableEditors(),
 	"git.listBranches": (params) => listBranches(params.projectId),
+	"git.listBranchesForCleanup": (params, ctx) => {
+		requireBranchCleanup(ctx);
+		return branchCleanupList(params.projectId);
+	},
+	"git.deleteBranch": (params, ctx) => {
+		requireBranchCleanup(ctx);
+		return deleteBranch(params);
+	},
 	"git.prefetch": async (p) => {
 		const { ok, moved } = await prefetchBranch(p.projectId, p.ref);
 		if (moved) nudgeBaseRefWorkspaces(p.projectId, p.ref);
@@ -1211,6 +1196,13 @@ export function requestMethodDiagnostic(method: string): string {
 }
 function supportsBranchStatus(protocolVersion: number | undefined): boolean {
 	return protocolVersion === undefined || protocolVersion >= BRANCH_STATUS_PROTOCOL_VERSION;
+}
+function requireBranchCleanup(ctx: RequestContext): void {
+	if (ctx.protocolVersion === undefined || ctx.protocolVersion < BRANCH_CLEANUP_PROTOCOL_VERSION)
+		throw new CodedError(
+			"BRANCH_CLEANUP_UNSUPPORTED",
+			"Local branch cleanup requires a newer host and client",
+		);
 }
 export function shouldRefreshOpenReview(allowCached: boolean | undefined): boolean {
 	return allowCached !== true;

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, lstatSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { existsSync, lstatSync, mkdirSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import {
 	DEFAULT_WORKSPACE_NAME,
 	type DiffStats,
@@ -11,6 +11,7 @@ import {
 	type SubagentOverride,
 	type Workspace,
 } from "@thinkrail/contracts";
+import { CodedError } from "@thinkrail/shared/codedError";
 import { WORKSPACE_CONTEXT_DIR } from "@thinkrail/shared/paths";
 import {
 	assertSafeRef,
@@ -19,7 +20,8 @@ import {
 	currentBranch,
 	git,
 	gitAsync,
-	gitHeadSha,
+	listGitWorktrees as gitWorktreeEntries,
+	listGitWorktreesSync,
 	listRemotes,
 	remoteNameOf,
 	remoteRefOid,
@@ -101,32 +103,6 @@ function openProjectById(projectId: string): Project {
 	const project = listProjects().find((candidate) => candidate.id === projectId);
 	if (!project) throw new Error(`Unknown project: ${projectId}`);
 	return project;
-}
-
-interface GitWorktreeEntry {
-	path: string;
-	branch?: string;
-	prunable: boolean;
-}
-
-async function gitWorktreeEntries(repoPath: string): Promise<GitWorktreeEntry[]> {
-	const listed = await gitAsync(repoPath, ["worktree", "list", "--porcelain", "-z"], { raw: true });
-	if (!listed.ok) throw new Error(`git worktree list failed: ${listed.err}`);
-	const entries: GitWorktreeEntry[] = [];
-	for (const record of listed.out.split("\0\0")) {
-		if (!record) continue;
-		let path: string | undefined;
-		let branch: string | undefined;
-		let prunable = false;
-		for (const field of record.split("\0")) {
-			if (field.startsWith("worktree ")) path = field.slice("worktree ".length);
-			else if (field.startsWith("branch refs/heads/")) {
-				branch = field.slice("branch refs/heads/".length);
-			} else if (field === "prunable" || field.startsWith("prunable ")) prunable = true;
-		}
-		if (path) entries.push({ path: resolve(path), prunable, ...(branch ? { branch } : {}) });
-	}
-	return entries;
 }
 
 export async function listExistingWorktrees(
@@ -547,8 +523,10 @@ export function backfillWorkspaceActivity(id: string, at: number): Workspace | n
 }
 
 export function recordWorkspaceHead(id: string): void {
-	if (!loadWorkspaces().some((workspace) => workspace.id === id)) return;
-	const sha = gitHeadSha(id);
+	const workspace = loadWorkspaces().find((candidate) => candidate.id === id);
+	if (!workspace) return;
+	const head = git(workspace.worktreePath, ["rev-parse", "--verify", "--quiet", "HEAD"]);
+	const sha = head.ok && head.out ? head.out : null;
 	if (!sha) return;
 	const previous = observedHeadSha.get(id);
 	observedHeadSha.set(id, sha);
@@ -659,7 +637,7 @@ export function listWorkspaceRecords(projectId: string): Workspace[] {
 }
 
 export function listAllWorkspaceRecords(): Workspace[] {
-	return loadWorkspaces();
+	return loadWorkspaces({ strict: true });
 }
 
 export function forgetWorkspace(id: string): Workspace | null {
@@ -677,18 +655,87 @@ export function forgetWorkspace(id: string): Workspace | null {
 export function reclaimWorktree(ws: Workspace): void {
 	if (ws.kind === "default" || ws.kind === "external") return;
 	const project = loadProjects().find((p) => p.id === ws.projectId);
-	if (!project) return;
-	if (resolve(ws.worktreePath) === resolve(project.path)) return;
-	const removed = git(project.path, ["worktree", "remove", "--force", ws.worktreePath]);
-	if (!removed.ok) {
-		rmSync(ws.worktreePath, { recursive: true, force: true });
-		git(project.path, ["worktree", "prune"]);
+	assertWorktreeRemovable(ws);
+	if (!project)
+		throw new CodedError("WORKSPACE_RECLAIM_FAILED", "The workspace project is unavailable");
+	if (!existsSync(ws.worktreePath)) {
+		const registered = listGitWorktreesSync(project.path).some(
+			(entry) => canonicalPath(entry.path) === canonicalPath(ws.worktreePath),
+		);
+		if (!registered && !existsSync(ws.worktreePath)) return;
 	}
+	const removed = git(project.path, ["worktree", "remove", "--", resolve(ws.worktreePath)]);
+	if (!removed.ok)
+		throw new CodedError("WORKSPACE_RECLAIM_FAILED", `Could not remove worktree: ${removed.err}`);
 }
 
 export function removeWorkspace(id: string): void {
-	const ws = forgetWorkspace(id);
-	if (ws) reclaimWorktree(ws);
+	const ws = loadWorkspaces().find((candidate) => candidate.id === id);
+	if (!ws) return;
+	if (ws.kind === "default") throw new Error("The Default workspace cannot be removed");
+	assertWorktreeRemovable(ws);
+	reclaimWorktree(ws);
+	forgetWorkspace(id);
+}
+
+export function assertWorktreeRemovable(ws: Workspace): void {
+	if (ws.kind === "default") throw new Error("The Default workspace cannot be removed");
+	if (ws.kind === "external") return;
+	const project = loadProjects().find((candidate) => candidate.id === ws.projectId);
+	if (!project)
+		throw new CodedError("WORKSPACE_RECLAIM_FAILED", "The workspace project is unavailable");
+	const root = resolve(dataDir(), "worktrees");
+	const target = resolve(ws.worktreePath);
+	const within = relative(root, target);
+	if (
+		!within ||
+		within.startsWith("..") ||
+		isAbsolute(within) ||
+		loadProjects().some((candidate) => canonicalPath(target) === canonicalPath(candidate.path))
+	) {
+		throw new CodedError(
+			"WORKSPACE_UNSAFE_PATH",
+			"The worktree is outside application-managed storage",
+		);
+	}
+	for (let path = target; ; path = dirname(path)) {
+		if (lstatSync(path, { throwIfNoEntry: false })?.isSymbolicLink())
+			throw new CodedError("WORKSPACE_UNSAFE_PATH", "A worktree path component is a symbolic link");
+		if (path === dirname(path)) break;
+	}
+	if (!existsSync(target)) return;
+	const marker = lstatSync(join(target, ".git"), { throwIfNoEntry: false });
+	if (!marker?.isFile() || marker.isSymbolicLink())
+		throw new CodedError("WORKSPACE_UNSAFE_PATH", "The managed worktree has an invalid Git marker");
+	const common = git(target, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+	const expectedCommon = git(project.path, [
+		"rev-parse",
+		"--path-format=absolute",
+		"--git-common-dir",
+	]);
+	const top = git(target, ["rev-parse", "--show-toplevel"]);
+	if (
+		!common.ok ||
+		!expectedCommon.ok ||
+		!top.ok ||
+		canonicalPath(common.out) !== canonicalPath(expectedCommon.out) ||
+		canonicalPath(top.out) !== canonicalPath(target)
+	) {
+		throw new CodedError(
+			"WORKSPACE_UNSAFE_PATH",
+			"The managed directory no longer belongs to this repository",
+		);
+	}
+	const status = git(target, ["status", "--porcelain=v1", "--untracked-files=all", "-z"], {
+		raw: true,
+	});
+	if (!status.ok)
+		throw new CodedError("WORKSPACE_RECLAIM_FAILED", `Could not inspect worktree: ${status.err}`);
+	if (status.out)
+		throw new CodedError(
+			"WORKSPACE_DIRTY",
+			"Commit, export or remove uncommitted changes and untracked files before removing this workspace.",
+		);
 }
 
 export async function workspaceDiffStats(id: string): Promise<DiffStats> {

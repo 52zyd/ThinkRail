@@ -2765,7 +2765,10 @@ export async function settleSessionsForShutdown(
 	}
 }
 
-async function removeWorkspaceSessionsInternal(workspaceId: string, cwd?: string): Promise<void> {
+export async function withWorkspaceSessionsClosed<T>(
+	workspaceId: string,
+	operation: () => Promise<T>,
+): Promise<T> {
 	workspaceLifecycleGenerations.set(
 		workspaceId,
 		(workspaceLifecycleGenerations.get(workspaceId) ?? 0) + 1,
@@ -2783,8 +2786,7 @@ async function removeWorkspaceSessionsInternal(workspaceId: string, cwd?: string
 			Promise.all(removals),
 		]);
 		await Promise.all([...(pendingCascades.get(workspaceId) ?? [])]);
-		removeWorkspaceDelegation(workspaceId);
-		if (cwd) await purgeDiskSessions(cwd);
+		return await operation();
 	} finally {
 		const remainingClosures = (closingWorkspaces.get(workspaceId) ?? 1) - 1;
 		if (remainingClosures === 0) closingWorkspaces.delete(workspaceId);
@@ -2793,16 +2795,16 @@ async function removeWorkspaceSessionsInternal(workspaceId: string, cwd?: string
 }
 
 export function removeWorkspaceSessions(workspaceId: string, cwd?: string): Promise<void> {
-	return removeWorkspaceSessionsInternal(workspaceId, cwd);
+	return withWorkspaceSessionsClosed(workspaceId, () => purgeWorkspaceSessions(workspaceId, cwd));
+}
+
+export async function purgeWorkspaceSessions(workspaceId: string, cwd?: string): Promise<void> {
+	removeWorkspaceDelegation(workspaceId);
+	if (cwd) await purgeDiskSessions(cwd);
 }
 
 async function purgeDiskSessions(cwd: string): Promise<void> {
-	let infos: Awaited<ReturnType<typeof SessionManager.list>>;
-	try {
-		infos = await SessionManager.list(cwd);
-	} catch {
-		return;
-	}
+	const infos = await SessionManager.list(cwd);
 	for (const info of infos) {
 		if (info.cwd !== cwd) continue;
 		rmSync(info.path, { force: true });

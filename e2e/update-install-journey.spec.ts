@@ -214,11 +214,13 @@ test("a successful install after relaunch toasts once and keeps Details from the
 	});
 	await openAppFresh(page);
 
-	const toast = page.getByTestId("toast").filter({ hasText: "Updated to 0.3.0-nightly.4" });
+	const toast = page
+		.getByTestId("toast")
+		.filter({ hasText: /(?:Updated to|已更新到) 0\.3\.0-nightly\.4/ });
 	await expect(toast).toHaveCount(1);
-	await expect(toast).toContainText("from 0.3.0-nightly.1");
+	await expect(toast).toContainText(/(?:from|自) 0\.3\.0-nightly\.1/);
 	await expect.poll(() => bridgeCalls(page)).toEqual(["dismiss"]);
-	await toast.getByRole("button", { name: "Details" }).click();
+	await toast.getByRole("button", { name: /^(?:Details|详情)$/ }).click();
 	const details = page.getByTestId("update-install-details");
 	await expect(details).toContainText("ThinkRail 0.3.0-nightly.4 is installed");
 	await expect(details.getByRole("link", { name: "What's new" })).toHaveAttribute(

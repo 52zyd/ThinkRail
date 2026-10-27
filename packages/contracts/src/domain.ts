@@ -687,6 +687,39 @@ export interface BranchList {
 	defaultBranch: string;
 }
 
+export interface BranchCleanupEntry {
+	name: string;
+	oid: string;
+	unmergedCommits: number;
+	worktreePaths: string[];
+	blockedReason?: "default" | "worktree" | "workspace";
+	workspaceNames?: string[];
+	workspaceIds?: string[];
+}
+
+export interface BranchCleanupList {
+	baseRef: string;
+	baseOid: string;
+	branches: BranchCleanupEntry[];
+}
+
+export interface BranchDeleteInput {
+	projectId: string;
+	name: string;
+	oid: string;
+	baseRef: string;
+	baseOid: string;
+	allowUnmerged?: boolean;
+	confirmName?: string;
+}
+
+export interface WorkspaceRemoveResult {
+	ok: true;
+	branchDeleted?: boolean;
+	retainedBranch?: string;
+	cleanupError?: string;
+}
+
 export type ProviderAuthKind = "oauth" | "api-key" | "env" | "central" | "other";
 
 export interface CompatibleModelInput {

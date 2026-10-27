@@ -1,4 +1,13 @@
 export {
+	deleteLocalBranch,
+	type GitWorktreeEntry,
+	listBranchesForCleanup,
+	listGitWorktrees,
+	listGitWorktreesSync,
+	repositoryCleanupKey,
+	validateLocalBranchDeletion,
+} from "./cleanup";
+export {
 	changedFileArgs,
 	type DiffRange,
 	diffBaseRef,
@@ -37,5 +46,11 @@ export {
 } from "./git";
 export { git, gitAsync, gitAsyncBytes, gitAsyncStream, nonInteractiveGitEnv } from "./gitExec";
 export { ignoredPaths } from "./ignored";
-export { assertSafeRef, isSafeRef, remoteNameOf, remoteTrackingRef } from "./refs";
+export {
+	assertSafeRef,
+	isSafeRef,
+	refersToLocalBranch,
+	remoteNameOf,
+	remoteTrackingRef,
+} from "./refs";
 export { snapshotWorktree } from "./snapshot";

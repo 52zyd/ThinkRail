@@ -3,6 +3,8 @@ import type {
 	AppConfigUpdate,
 	BackgroundCommandCompletionDetails,
 	BackgroundCommandOutputResult,
+	BranchCleanupList,
+	BranchDeleteInput,
 	BranchList,
 	BranchStatus,
 	ChangeReceipt,
@@ -65,6 +67,7 @@ import type {
 	TodoStatus,
 	TurnChangeSet,
 	Workspace,
+	WorkspaceRemoveResult,
 } from "./domain";
 import { isDelegationRunDetails } from "./domain";
 import type {
@@ -119,7 +122,8 @@ export type TemplateReadLocation =
 	| { projectId: string; workspaceId?: never }
 	| { workspaceId?: never; projectId?: never };
 
-export const PROTOCOL_VERSION = 92;
+export const PROTOCOL_VERSION = 93;
+export const BRANCH_CLEANUP_PROTOCOL_VERSION = 93;
 export const COMPATIBLE_PROVIDERS_PROTOCOL_VERSION = 91;
 export const CLIENT_ERROR_REPORT_PROTOCOL_VERSION = 90;
 export const LOCALES_PROTOCOL_VERSION = 89;
@@ -235,6 +239,8 @@ export const WS_METHODS = {
 	workspaceReveal: "workspace.reveal",
 	editorList: "editor.list",
 	gitListBranches: "git.listBranches",
+	gitListBranchesForCleanup: "git.listBranchesForCleanup",
+	gitDeleteBranch: "git.deleteBranch",
 	gitPrefetch: "git.prefetch",
 	githubAuthStatus: "github.authStatus",
 	githubRefresh: "github.refresh",
@@ -620,7 +626,10 @@ export interface WsMethodMap {
 		params: { workspaceId: string; branch: string };
 		result: Ack;
 	};
-	"workspace.remove": { params: { id: string }; result: Ack };
+	"workspace.remove": {
+		params: { id: string; deleteBranch?: Omit<BranchDeleteInput, "projectId"> };
+		result: WorkspaceRemoveResult;
+	};
 	"workspace.diffStats": { params: { id: string }; result: DiffStats };
 	"workspace.setSkillOverride": {
 		params: { id: string; name: string; override: "on" | "off" | null };
@@ -647,6 +656,8 @@ export interface WsMethodMap {
 	"workspace.reveal": { params: { id: string }; result: Ack };
 	"editor.list": { params: Record<string, never>; result: EditorInfo[] };
 	"git.listBranches": { params: { projectId: string }; result: BranchList };
+	"git.listBranchesForCleanup": { params: { projectId: string }; result: BranchCleanupList };
+	"git.deleteBranch": { params: BranchDeleteInput; result: Ack };
 	"git.prefetch": { params: { projectId: string; ref: string }; result: { ok: boolean } };
 	"github.authStatus": { params: Record<string, never>; result: GithubAuthStatus };
 	"github.refresh": { params: Record<string, never>; result: GithubAuthStatus };
@@ -1063,6 +1074,18 @@ export interface WsResume {
 export type WsClientMessage = WsRequest | WsAck | WsResume;
 
 export type WsErrorCode =
+	| "BRANCH_CLEANUP_READ_FAILED"
+	| "BRANCH_CLEANUP_INVALID"
+	| "BRANCH_CLEANUP_STALE"
+	| "BRANCH_CLEANUP_PROTECTED"
+	| "BRANCH_CLEANUP_OCCUPIED"
+	| "BRANCH_CLEANUP_REFERENCED"
+	| "BRANCH_CLEANUP_CONFIRM_REQUIRED"
+	| "BRANCH_CLEANUP_DELETE_FAILED"
+	| "BRANCH_CLEANUP_UNSUPPORTED"
+	| "WORKSPACE_RECLAIM_FAILED"
+	| "WORKSPACE_UNSAFE_PATH"
+	| "WORKSPACE_DIRTY"
 	| "COMPATIBLE_INVALID"
 	| "COMPATIBLE_IN_USE"
 	| "COMPATIBLE_CONFIG_FAILED"

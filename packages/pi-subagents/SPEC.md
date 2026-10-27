@@ -103,8 +103,10 @@ review and thread semantics stay outside this portable role.
 ## The mapping (policy, not mechanism)
 
 `toSpawnMapping`: definition + optional invocation model → `SessionOptions` + `RunOptions.maxTurns`.
-The effective reference follows definition pin → invocation model → parent inheritance. A pin discards
-the invocation reference, including its thinking suffix, without resolving it. References resolve
+The effective reference follows definition pin → invocation model → live parent inheritance. Empty or
+whitespace-only references at either source mean no selection; identity lookup rejects empty prefixes.
+The tool recommends omission for inheritance and full `provider/id` for explicit selection. A nonempty pin
+discards the invocation reference, including its thinking suffix, without resolving it. References resolve
 against the session's available models (`provider/id` → exact id → unique prefix); no provider
 substitution, custom model synthesis or parent fallback is permitted for an unresolved selection.
 
@@ -149,7 +151,8 @@ Pi behavior is unchanged unless its caller explicitly supplies the user reason.
 
 ## Verification
 
-Unit suites in-package (`bun test`) pin literal-ID/suffix precedence, ambiguity, definition thinking,
+Unit suites in-package (`bun test`) pin blank/omitted model inheritance against empty, single and multiple
+model catalogs, live parent model changes, literal-ID/suffix precedence, ambiguity, definition thinking,
 Pi-clamped child thinking, parent isolation and failures before child creation, including a two-extension regression where one extension
 registers a synthetic provider and the zero-config subagents extension delegates through it. Public Pi
 session tests pin gated replay, real reload gaps, permanent closure, synchronous send failures,

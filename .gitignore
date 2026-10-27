@@ -44,3 +44,6 @@ playwright-report-desktop/
 
 # Astro's generated type cache
 .astro/
+
+# Private local task instructions.
+/任务.md

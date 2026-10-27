@@ -13,7 +13,7 @@ import { LoadingRegion } from "@thinkrail/ui/skeleton";
 import { Switch } from "@thinkrail/ui/switch";
 import { IconTooltip } from "@thinkrail/ui/tooltip";
 import { cn } from "@thinkrail/ui/utils";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast, useAppStore } from "@/store";
 import { errorText, getTransport, reloadSessionResourcesWithSkillBaseline } from "@/transport";
 import {
@@ -88,6 +88,7 @@ export function SkillsDialog({
 }) {
 	const t = useT();
 	const project = useAppStore((s) => s.projects.find((p) => p.id === projectId));
+	const titleRef = useRef<HTMLHeadingElement>(null);
 	const [entries, setEntries] = useState<SkillCatalogEntry[] | null>(null);
 	const [busy, setBusy] = useState(false);
 	const workspaceId = workspace?.workspaceId;
@@ -238,9 +239,20 @@ export function SkillsDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent data-testid="skills-dialog" className="max-w-[560px] gap-12 p-12">
+			<DialogContent
+				data-testid="skills-dialog"
+				className="max-w-[560px] gap-12 p-12"
+				onOpenAutoFocus={(event) => {
+					event.preventDefault();
+					titleRef.current?.focus();
+				}}
+			>
 				<div className="flex items-center justify-between gap-8 pr-[2rem]">
-					<DialogTitle className="tr-text-ui text-text-default">
+					<DialogTitle
+						ref={titleRef}
+						tabIndex={-1}
+						className="tr-text-ui text-text-default outline-none"
+					>
 						{t("chat.skills.title")}
 					</DialogTitle>
 					{workspace ? (

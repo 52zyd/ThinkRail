@@ -324,14 +324,14 @@ test("project context actions stay compact and close/reopen is lossless across c
 	await expect(expand).toHaveCSS("opacity", "1");
 	await expect(addWorkspace).toHaveCSS("opacity", "1");
 	await expect(fixtureRow.getByTestId("close-project")).toHaveCount(0);
-	await expect(fixtureRow.getByLabel(/project actions/i)).toHaveCount(0);
+	await expect(fixtureRow.getByTestId("project-menu")).toBeVisible();
 
 	await expand.click();
 	const count = fixtureRow.getByTestId("project-workspace-count");
 	await expect(count).toHaveText("1");
 	expect(
 		await count.evaluate((element) => element.nextElementSibling?.getAttribute("data-testid")),
-	).toBe("add-workspace");
+	).toBe("project-menu");
 
 	const projectActions = page.getByTestId("project-actions");
 	await fixtureName.focus();
@@ -362,12 +362,13 @@ test("project context actions stay compact and close/reopen is lossless across c
 	const renameFromMenu = page.getByTestId("project-menu-rename");
 	const closeFromMenu = page.getByTestId("project-menu-close");
 	const menuParts = projectActions.locator('[role="menuitem"], [role="separator"]');
-	await expect(menuParts).toHaveCount(5);
+	await expect(menuParts).toHaveCount(6);
 	await expect(menuParts.nth(0)).toHaveText("Create workspace");
 	await expect(menuParts.nth(1)).toHaveText("Open existing worktree…");
 	await expect(menuParts.nth(2)).toHaveAttribute("role", "separator");
-	await expect(menuParts.nth(3)).toHaveText("Rename");
-	await expect(menuParts.nth(4)).toHaveText("Close project");
+	await expect(menuParts.nth(3)).toHaveText("Manage local branches");
+	await expect(menuParts.nth(4)).toHaveText("Rename");
+	await expect(menuParts.nth(5)).toHaveText("Close project");
 	await expect(createFromMenu.locator("svg.remixicon")).toHaveCount(1);
 	await expect(openExistingFromMenu.locator("svg.remixicon")).toHaveCount(1);
 	await expect(renameFromMenu.locator("svg.remixicon")).toHaveCount(1);
@@ -376,6 +377,8 @@ test("project context actions stay compact and close/reopen is lossless across c
 	await expect(createFromMenu).toBeFocused();
 	await page.keyboard.press("ArrowDown");
 	await expect(openExistingFromMenu).toBeFocused();
+	await page.keyboard.press("ArrowDown");
+	await expect(page.getByTestId("project-menu-manage-branches")).toBeFocused();
 	await page.keyboard.press("ArrowDown");
 	await expect(renameFromMenu).toBeFocused();
 	await page.keyboard.press("ArrowDown");

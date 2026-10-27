@@ -95,5 +95,5 @@ try {
 	desktop.kill("SIGKILL");
 	throw error;
 } finally {
-	globalTeardown();
+	await globalTeardown();
 }

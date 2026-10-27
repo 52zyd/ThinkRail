@@ -10,6 +10,7 @@ import {
 } from "./fixtures/app";
 import { git, gitText } from "./fixtures/git";
 import { E2E_DATA_DIR, E2E_FIXTURE_REPO, E2E_PICK_DIR_POINTER } from "./fixtures/paths";
+import { disposeFixtureResources } from "./fixtures/resources";
 
 test("opens and safely forgets an existing user-owned worktree", async ({ page }) => {
 	await openAppFresh(page);
@@ -152,6 +153,14 @@ test("an attached worktree cannot also be opened as a project", async ({ page })
 		await expect(page.getByTestId("project-item")).toHaveCount(1);
 	} finally {
 		writeFileSync(E2E_PICK_DIR_POINTER, E2E_FIXTURE_REPO);
+		const workspaces: { id: string }[] = JSON.parse(
+			readFileSync(join(E2E_DATA_DIR, "workspaces.json"), "utf8"),
+		);
+		const hostUrl = new URL(page.url());
+		await disposeFixtureResources(
+			Number(hostUrl.port),
+			workspaces.map((workspace) => workspace.id),
+		);
 		try {
 			git(E2E_FIXTURE_REPO, "worktree", "remove", "--force", external);
 		} catch {

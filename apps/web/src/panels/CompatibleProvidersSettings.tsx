@@ -1,4 +1,4 @@
-import { RiAddLine, RiDeleteBin6Line, RiEditLine } from "@remixicon/react";
+import { RiAddLine, RiDeleteBin6Line, RiEditLine, RiExternalLinkLine } from "@remixicon/react";
 import type {
 	CompatibleModelInput,
 	CompatibleProvider,
@@ -17,6 +17,7 @@ import { SettingsGroup } from "./SettingsGroup";
 
 const INPUT =
 	"w-full min-w-0 rounded-sm border border-control-border-default bg-control-bg px-8 py-4 tr-text-ui text-text-default outline-none placeholder:text-text-muted focus-visible:border-control-border-active disabled:opacity-50";
+const RECOMMENDED_BASE_URL = "https://www.llaigw.com/v1";
 const ERROR_KEYS: Record<string, MessageKey> = {
 	COMPATIBLE_INVALID: "settings.compatible.invalid",
 	COMPATIBLE_IN_USE: "settings.compatible.inUse",
@@ -34,7 +35,7 @@ export function CompatibleProvidersSettings({ onChanged }: { onChanged: () => Pr
 	const t = useT();
 	const version = useAppStore((s) => s.providerVersion);
 	const [providers, setProviders] = useState<CompatibleProvider[]>([]);
-	const [editing, setEditing] = useState<CompatibleProvider | "new" | null>(null);
+	const [editing, setEditing] = useState<CompatibleProvider | "new" | "recommended" | null>(null);
 	const [removing, setRemoving] = useState<CompatibleProvider | null>(null);
 	const [error, setError] = useState("");
 	const [loading, setLoading] = useState(true);
@@ -87,6 +88,41 @@ export function CompatibleProvidersSettings({ onChanged }: { onChanged: () => Pr
 			description={t("settings.compatible.description")}
 			testId="compatible-providers"
 		>
+			<div
+				data-testid="compatible-recommended"
+				className="mb-12 flex min-w-0 flex-col gap-12 rounded-sm border border-primary-soft bg-primary-subtle p-12"
+			>
+				<div className="min-w-0">
+					<h4 className="tr-title-card text-primary">
+						{t("settings.compatible.recommended.name")}
+					</h4>
+					<p className="break-all tr-text-metadata text-text-default">{RECOMMENDED_BASE_URL}</p>
+					<p className="mt-4 tr-text-metadata text-text-default">
+						{t("settings.compatible.recommended.description")}
+					</p>
+				</div>
+				<div className="flex flex-wrap items-center gap-8">
+					<Button
+						variant="outline"
+						size="sm"
+						data-testid="compatible-recommended-configure"
+						disabled={busy || loading || editing !== null}
+						onClick={() => setEditing("recommended")}
+					>
+						{t("settings.compatible.recommended.configure")}
+					</Button>
+					<a
+						data-testid="compatible-recommended-website"
+						href="https://www.llaigw.com"
+						target="_blank"
+						rel="noopener noreferrer"
+						className="inline-flex items-center gap-4 rounded-sm px-8 py-4 tr-text-ui text-primary outline-none hover:bg-control-bg-hovered focus-visible:ring-2 focus-visible:ring-primary"
+					>
+						{t("settings.compatible.recommended.website")}
+						<RiExternalLinkLine aria-hidden="true" className="size-14 shrink-0" />
+					</a>
+				</div>
+			</div>
 			{loading ? (
 				<p className="py-12 tr-text-metadata text-text-muted">{t("common.loading")}</p>
 			) : null}
@@ -138,8 +174,17 @@ export function CompatibleProvidersSettings({ onChanged }: { onChanged: () => Pr
 			))}
 			{editing ? (
 				<CompatibleProviderForm
-					key={editing === "new" ? "new" : editing.id}
-					provider={editing === "new" ? undefined : editing}
+					key={typeof editing === "string" ? editing : editing.id}
+					provider={typeof editing === "string" ? undefined : editing}
+					initialValues={
+						editing === "recommended"
+							? {
+									name: t("settings.compatible.recommended.name"),
+									baseUrl: RECOMMENDED_BASE_URL,
+									api: "openai-completions",
+								}
+							: undefined
+					}
 					onSave={save}
 					onCancel={() => setEditing(null)}
 				/>
@@ -183,21 +228,23 @@ const newModel = (model: CompatibleModelInput = { id: "" }): ModelDraft => ({
 
 export function CompatibleProviderForm({
 	provider,
+	initialValues,
 	onSave,
 	onCancel,
 }: {
 	provider?: CompatibleProvider | undefined;
+	initialValues?: Pick<CompatibleProviderInput, "name" | "baseUrl" | "api"> | undefined;
 	onSave: (input: CompatibleProviderInput) => Promise<void>;
 	onCancel: () => void;
 }) {
 	const t = useT();
-	const [name, setName] = useState(provider?.name ?? "");
-	const [url, setUrl] = useState(provider?.baseUrl ?? "");
+	const [name, setName] = useState(provider?.name ?? initialValues?.name ?? "");
+	const [url, setUrl] = useState(provider?.baseUrl ?? initialValues?.baseUrl ?? "");
 	const [api, setApi] = useState<CompatibleProviderInput["api"]>(
-		provider?.api ?? "openai-completions",
+		provider?.api ?? initialValues?.api ?? "openai-completions",
 	);
 	const [key, setKey] = useState("");
-	const [noKey, setNoKey] = useState(provider ? !provider.hasKey : true);
+	const [noKey, setNoKey] = useState(provider ? !provider.hasKey : initialValues === undefined);
 	const [models, setModels] = useState<ModelDraft[]>(
 		provider?.models.map(newModel) ?? [newModel()],
 	);

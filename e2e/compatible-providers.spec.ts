@@ -58,13 +58,16 @@ test("compatible services support Chinese CRUD, discovery, manual models and ret
 		const shots = join(E2E_SCREENSHOT_DIR, "compatible-providers");
 		mkdirSync(shots, { recursive: true });
 		await page.setViewportSize({ width: 1280, height: 1150 });
-		await page.getByTestId("compatible-providers").getByRole("heading").scrollIntoViewIfNeeded();
+		await page
+			.getByTestId("compatible-providers")
+			.getByRole("heading", { level: 3 })
+			.scrollIntoViewIfNeeded();
 		await page
 			.getByTestId("settings-dialog")
 			.screenshot({ path: join(shots, "providers-zh.png"), animations: "disabled" });
 		await page.setViewportSize({ width: 1280, height: 1600 });
 		await page.getByTestId("compatible-providers").scrollIntoViewIfNeeded();
-		await page.getByTestId("compatible-providers").screenshot({
+		await page.getByTestId("compatible-form").screenshot({
 			path: join(shots, "compatible-service-zh.png"),
 			animations: "disabled",
 		});

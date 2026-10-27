@@ -40,7 +40,7 @@ const SVG_ROOT = /^\s*<svg[\s>]/;
 const XML_PROLOG = /^\s*<\?xml(?:\s|\?>)/;
 const LFS_POINTER_LIMIT = 1024;
 const LFS_POINTER =
-	/^version https:\/\/git-lfs\.github\.com\/spec\/v1\noid sha256:[0-9a-f]{64}\nsize \d{1,15}\n$/;
+	/^version https:\/\/git-lfs\.github\.com\/spec\/v1\r?\noid sha256:[0-9a-f]{64}\r?\nsize \d{1,15}\r?\n$/;
 
 function startsWith(bytes: Uint8Array, magic: readonly number[], offset = 0): boolean {
 	if (bytes.length < offset + magic.length) return false;

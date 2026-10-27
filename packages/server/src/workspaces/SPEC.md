@@ -10,6 +10,10 @@ tags: [public-surface-checked]
 
 ## Responsibility
 
+HEAD observation uses one workspace-record snapshot and queries Git by its captured directory. A
+record disappearing while a filesystem notification is being handled must not trigger a second
+by-id lookup or crash the host; a missing directory simply yields no observation.
+
 A workspace is a `git worktree` on its own branch under the data dir — the anchor for files/git/terminals/
 chats. Its **display `name` is decoupled from its git `branch`**: `name` is a human-readable label
 (Title Case, spaces) and `branch` is a kebab slug derived from it — they were once held equal, and still
@@ -139,14 +143,19 @@ place as `kind: "external"` — outside the data dir, never created or mutated h
   answer, rather than a fabricated `+0 −0` — a failed read must not paint a dirty worktree as clean; the
   `Workspace.diffStats` field is simply absent, and `workspaceDiffStats` rejects,
   `getWorkspace` (by-id lookup, throws on unknown — anchors a chat session's cwd),
-  and the **archive** primitives, split so the fast record-drop
-  and the slow git reclaim are separable (the host archives off the request's critical path):
+  and the **archive** primitives, split so the host controls reclamation before record-drop:
   `forgetWorkspace(id)` (drop the persistence record, return the removed record or `null` — gone from
-  `listWorkspaces` immediately), `reclaimWorktree(ws)` (the slow half — `git worktree remove --force`,
-  keeps the branch; hardened: rm + `prune` if git fails; **refuses both user-owned kinds and,
-  defense-in-depth, any record whose `worktreePath` resolves to the project folder** — the rm-fallback must
-  never see the user's repo or an attached checkout, however a corrupt/hand-edited record got there), and
-  `removeWorkspace(id)` (the synchronous composition of the two, kept for callers/tests that want the whole
+  `listWorkspaces` immediately), `assertWorktreeRemovable(ws)` (validate the managed path and reject
+  tracked edits or non-ignored untracked files), `reclaimWorktree(ws)` (the slow half — Git removes
+  the verified clean worktree and keeps the branch; failures throw, without recursive rm / global prune;
+  **refuses both user-owned kinds and,
+  defense-in-depth, any record whose `worktreePath` resolves to any registered project folder**, including
+  a managed checkout subsequently opened as a separate project. Managed paths
+  must stay below app worktree storage, have no symlink ancestor or Git marker, and still belong to
+  the recorded repository; no recursive-delete fallback exists. A missing checkout is already reclaimed
+  only when a successful Git registry read also confirms it is unregistered; unreadable facts keep the
+  record and history for retry), and
+  `removeWorkspace(id)` (reclaim before forget, kept for callers/tests that want the whole
   archive in one call).
 - **Default workspace (`kind: "default"`):** exactly one per project. `listWorkspaces` **ensures** it
   — find-or-create by `projectId`+`kind` (id a plain `randomUUID`; the `kind` field is the marker,
@@ -248,7 +257,7 @@ place as `kind: "external"` — outside the data dir, never created or mutated h
   self-publishes), so registry membership stays shared domain state across every client (architecture #9).
 - **Public surface (barrel):** `createWorkspace`, `listExistingWorktrees`, `openExistingWorktree`,
   `listWorkspaces`, `listWorkspaceRecords`, `listAllWorkspaceRecords`, `forgetWorkspace`,
-  `reclaimWorktree`, `removeWorkspace`,
+  `assertWorktreeRemovable`, `reclaimWorktree`, `removeWorkspace`,
   `workspaceDiffStats`, `workspaceDiffKey`, `getWorkspace`, `renameWorkspace`, `refreshUserOwnedWorkspace`,
   `completeInitialTerminalReservation`, `ensureWorkspaceScratchDir`, `setWorkspacePublisher`,
   `WorkspaceLifecycleEvent`, `setWorkspaceDiffBase`, `setWorkspaceSkillOverride`,

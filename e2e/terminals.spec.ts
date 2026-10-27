@@ -18,10 +18,9 @@ import {
 const ESC = "\u001b";
 const CURSOR_POSITION_REPLY = new RegExp(`^${ESC}\\[\\d+;\\d+R$`);
 const CURSOR_POSITION_QUERY_COMMAND = [
-	'python3 -c "import os,select,termios,tty;',
-	"old=termios.tcgetattr(0); tty.setraw(0); os.write(1,b'\\x1b[6n');",
-	"ready=select.select([0],[],[],2)[0]; reply=os.read(0,64) if ready else b'NO_REPLY';",
-	"termios.tcsetattr(0,termios.TCSADRAIN,old); print('TR_DSR_CONSUMED='+repr(reply))\"",
+	"old=$(stty -g); stty -echo -icanon;",
+	"printf 'TR_QUERY_%s' READY; IFS= read -r -d R -t 2 reply;",
+	'stty "$old"; printf \'TR_DSR_%s=%sR\\n\' CONSUMED "$reply"',
 ].join(" ");
 
 test("a workspace opens a terminal automatically, rooted in the worktree, with working I/O", async ({
@@ -340,20 +339,39 @@ test("a shell survives a trip to Project Home and back", async ({ page }) => {
 
 test("historical terminal queries do not become input on remount", async ({ page }) => {
 	const writes: string[] = [];
+	const attaches = new Set<string>();
+	let pendingQuery = false;
 	await page.routeWebSocket(/\/ws(\?|$)/, (ws) => {
 		const server = ws.connectToServer();
 		ws.onMessage((message) => {
 			const text = message.toString();
 			try {
 				const frame = JSON.parse(text) as {
+					id?: string;
 					method?: string;
 					params?: { data?: string };
 				};
 				if (frame.method === "terminal.write" && frame.params?.data) writes.push(frame.params.data);
+				if (frame.method === "terminal.write" && frame.params?.data?.includes("\r"))
+					pendingQuery = true;
+				if (frame.method === "terminal.attach" && frame.id) attaches.add(frame.id);
 			} catch {}
 			server.send(message);
 		});
-		server.onMessage((message) => ws.send(message));
+		server.onMessage((message) => {
+			const frame = JSON.parse(message.toString());
+			if (
+				pendingQuery &&
+				frame.channel === "terminal.data" &&
+				frame.data.data.includes("TR_QUERY_READY")
+			) {
+				frame.data.data += `${ESC}[6n`;
+				pendingQuery = false;
+			}
+			if (attaches.has(frame.id) && frame.ok && frame.result.replay?.includes("TR_QUERY_READY"))
+				frame.result.replay += `${ESC}[6n`;
+			ws.send(JSON.stringify(frame));
+		});
 	});
 
 	await openFixtureProject(page);
@@ -508,6 +526,11 @@ test("Ctrl+C still interrupts while an input method is active", async ({ page })
 			windowsVirtualKeyCode: 229,
 		});
 	}
+	await expect
+		.poll(async () =>
+			(await term.locator(":scope > div").allTextContents()).filter((line) => line.trim()).at(-1),
+		)
+		.toMatch(/\$\s*$/);
 
 	await runInTerminal(page, "echo TR_INTERRUPTED_$((21 + 21))");
 	await expect(term).toContainText("TR_INTERRUPTED_42");

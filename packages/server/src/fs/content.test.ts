@@ -102,6 +102,10 @@ test("a Git LFS pointer is text with its own media type, whatever the file is na
 	expect(resourceMeta(BYTES.encode(pointer), "assets/photo.png").mime).toBe(
 		"application/vnd.git-lfs",
 	);
+	const windowsPointer = BYTES.encode(pointer.replaceAll("\n", "\r\n"));
+	expect(classifyBytes(windowsPointer)).toEqual({ text: true, mime: "application/vnd.git-lfs" });
+	expect(decodeText(windowsPointer)).toBe(pointer.replaceAll("\n", "\r\n"));
+	expect(hashBytes(windowsPointer)).not.toBe(hashBytes(BYTES.encode(pointer)));
 	expect(classifyBytes(BYTES.encode(`${pointer}\nA paragraph of prose, not a key.\n`))).toEqual({
 		text: true,
 	});

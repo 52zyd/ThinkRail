@@ -9,6 +9,7 @@ import {
 	openFixtureProject,
 	revealModelGroups,
 } from "./fixtures/app";
+import { fixtureExecutable } from "./fixtures/executables";
 import {
 	assertOnlyReviewedArgv,
 	centralInvocations,
@@ -93,8 +94,8 @@ test("connects and follows external add, replacement, and remove without a host 
 
 test("guides absent, outdated, malformed, and failed Central version states", async ({ page }) => {
 	await openAppFresh(page);
-	const central = join(E2E_FAKE_BIN_DIR, "central");
-	const hidden = join(E2E_FAKE_BIN_DIR, "central.hidden");
+	const central = fixtureExecutable(E2E_FAKE_BIN_DIR, "central");
+	const hidden = fixtureExecutable(E2E_FAKE_BIN_DIR, "central.hidden");
 	renameSync(central, hidden);
 	try {
 		await openProviders(page);

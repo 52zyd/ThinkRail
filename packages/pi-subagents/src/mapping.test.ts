@@ -16,6 +16,52 @@ const AVAILABLE = [
 	{ provider: "openai", id: "gpt-5" },
 ];
 
+test.each([
+	undefined,
+	"",
+	" ",
+	"\t\n",
+])("unspecified model %j inherits without consulting the catalog", (model) => {
+	for (const availableModels of [[], AVAILABLE.slice(0, 1), AVAILABLE]) {
+		for (const definitionModel of [undefined, "", " \t"]) {
+			expect(
+				toSpawnMapping(
+					definition(definitionModel === undefined ? {} : { model: definitionModel }),
+					{
+						cwd: "/tmp/x",
+						availableModels,
+						...(model === undefined ? {} : { model }),
+					},
+				).session.model,
+			).toBeUndefined();
+		}
+		if (model !== undefined) expect(resolveModelRef(model, availableModels)).toBeUndefined();
+	}
+	expect(
+		toSpawnMapping(definition({ model: "openai/gpt-5" }), {
+			cwd: "/tmp/x",
+			availableModels: AVAILABLE,
+			...(model === undefined ? {} : { model }),
+		}).session.model,
+	).toEqual({ provider: "openai", id: "gpt-5" });
+});
+
+test.each([
+	"",
+	" \t",
+])("blank definition pin %j allows invocation selection and keeps its diagnostic", (model) => {
+	const options = { cwd: "/tmp/x", availableModels: AVAILABLE };
+	const mapping = toSpawnMapping(definition({ model }), {
+		...options,
+		model: "openai/gpt-5:xhigh",
+	});
+	expect(mapping.session.model).toEqual({ provider: "openai", id: "gpt-5" });
+	expect(mapping.session.thinkingLevel).toBe("xhigh");
+	expect(() =>
+		toSpawnMapping(definition({ model }), { ...options, model: "openai/missing" }),
+	).toThrow('requests model "openai/missing"');
+});
+
 function definition(overrides: Partial<AgentDefinition> = {}): AgentDefinition {
 	return {
 		name: "scout",
@@ -228,7 +274,7 @@ test("a suffix may follow a literal colon/slash ID, but is never recursively str
 	});
 	expect(mapping.session.model).toEqual(literal);
 	expect(mapping.session.thinkingLevel).toBe("xhigh");
-	for (const model of ["openai/gpt-5:low:xhigh", ":xhigh"]) {
+	for (const model of ["openai/gpt-5:low:xhigh", ":xhigh", " \t:xhigh"]) {
 		expect(() =>
 			toSpawnMapping(definition(), {
 				cwd: "/tmp/x",

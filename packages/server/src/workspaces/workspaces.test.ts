@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, mock, spyOn, test } from "bun:test";
 import {
 	existsSync,
 	mkdirSync,
@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import type { Workspace } from "@thinkrail/contracts";
 import { WORKSPACE_CONTEXT_DIR } from "@thinkrail/shared/paths";
+import * as persistence from "../persistence";
 import {
 	backfillWorkspaceActivity,
 	completeInitialTerminalReservation,
@@ -96,6 +97,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	mock.restore();
 	setWorkspacePublisher(null);
 	rmSync(dataDir, { recursive: true, force: true });
 	if (savedDataDir === undefined) delete process.env.THINKRAIL_DATA_DIR;
@@ -923,7 +925,7 @@ test("reclaimWorktree refuses a record pointing at the project folder even witho
 	const def = (await listWorkspaces("p1"))[0];
 	if (!def) throw new Error("expected the ensured Default workspace");
 	const { kind: _dropped, ...corrupt } = def;
-	reclaimWorktree(corrupt);
+	expect(() => reclaimWorktree(corrupt)).toThrow("outside application-managed storage");
 	expect(existsSync(join(repo, "README.md"))).toBe(true);
 });
 
@@ -1096,6 +1098,18 @@ test("backfillWorkspaceActivity fills only a missing stamp and touches no overri
 	expect(filled?.lastActiveAt).toBe(5);
 	expect(filled?.settledOverride).toBe("settled");
 	expect(backfillWorkspaceActivity("missing", 5)).toBeNull();
+});
+
+test("HEAD observation survives the workspace record disappearing after its snapshot", async () => {
+	const ws = await createWorkspace("p1");
+	const read = persistence.loadWorkspaces;
+	spyOn(persistence, "loadWorkspaces").mockImplementation((options) => {
+		const snapshot = read(options);
+		writeFileSync(join(dataDir, "workspaces.json"), "[]");
+		return snapshot;
+	});
+	expect(() => recordWorkspaceHead(ws.id)).not.toThrow();
+	expect(JSON.parse(readFileSync(join(dataDir, "workspaces.json"), "utf8"))).toEqual([]);
 });
 
 test("recordWorkspaceHead stamps activity only when the sha actually moved after the first look", async () => {

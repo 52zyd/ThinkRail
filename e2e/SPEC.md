@@ -11,12 +11,49 @@ tags: [testing, playwright, e2e]
 
 ## Responsibility
 
+`branch-cleanup.spec.ts` exercises both v93 cleanup entrances through the real host and disposable
+repository: merged/unmerged confirmation, stale identities, dirty removal, ref-lock partial failure,
+refresh, keyboard focus, Chinese phone layout and pre-v93 hiding. Ref locks belong only to the lane
+fixture. Documentation captures contain only the cleanup dialogs, excluding recommendation branding.
+An intercepted, version-negotiated delete request also forges a Windows case alias for the occupied
+default branch, proving host protection independently of the disabled UI control.
+Its direct setup wire uses the current page's host port so the same scenarios cover packaged hosts
+whose loopback port is allocated dynamically.
+The ref-lock partial-failure scenario allows 20 seconds for resource shutdown, Git's lock refusal and
+history cleanup before releasing its injected lock; the ordinary five-second DOM budget must not end
+the fault while that cleanup transaction is still running under concurrent lanes.
+
 The real-browser system gate for ThinkRail's host/UI integration: build the shipped web client, boot an
 isolated host, seed real git and persistence fixtures, drive Chromium through the wire, and clean up every
 machine-global resource it used. The default suite excludes provider-backed `@agent` tests; those remain
 explicit, authenticated, on-demand runs.
 
 ## Execution model
+
+Windows fixture commands are native launchers over the same reviewed POSIX scripts, executed by the
+installed Git Bash. One compiled launcher per lane is hard-linked under each command name. The host
+PATH remains fixture-bin plus native Git; shell-only utility paths are added inside the fixture
+launcher, never exposed to host agent/editor discovery. Install-state simulation uses filesystem
+rename, and direct fake-Central calls use that same platform executable.
+Interactive Windows fixtures use Git Bash itself as the PTY process, with utility PATH setup in
+the fixture HOME's bashrc. A permanent launcher child must not distort shell-busy detection.
+Fixture resets and source-suite teardown dispose chats and close all workspace terminals before
+removing their directories; Windows keeps live PTY working directories locked. Artifact runners
+await filesystem teardown after stopping their already-owned host.
+Windows fixture-root teardown removes reparse entries themselves with nonrecursive native calls
+before ordinary tree removal. WebView2 can create a protected Content.IE5 compatibility entry that
+Bun's recursive removal cannot handle. The walk never descends into a reparse target; it accepts only
+the named ThinkRail E2E roots directly under the temporary directory.
+Turbo passes through `SystemRoot` so native PowerShell probes remain available with a hermetic PATH.
+Terminal cursor-query replay coverage injects the query at the live-data and replay-attach wire
+seams. Windows ConPTY can answer a process's query internally, so the browser must receive the same
+controlled live versus historical bytes on every platform.
+The native installed-result probe accepts the initial Chinese default or hydrated English toast;
+native state can arrive before the host's saved language. Its version, single dismissal and Details
+snapshot assertions remain exact.
+Workspace creation fixtures wait for the initial chat body, not only its tab, before interacting with
+other resources. Terminal command fixtures await attachment and keyboard focus. Specs failure probes
+keep reads failing until the explicit Retry step so unrelated watcher nudges cannot end the fault.
 
 `bun run e2e` is the complete no-agent gate. It builds the web bundle once and runs machine-adaptive,
 process-level Playwright shards. A shard owns one host and one Playwright worker; serial execution inside
@@ -347,6 +384,11 @@ and pre-v76 hiding.
 General and private-restart fixtures explicitly seed English through `fixtures/settingsConfig.ts`.
 Telemetry-removal coverage asserts no Privacy navigation, consent prompt or client error frames,
 then restores English in teardown even when its Chinese UI assertions fail.
+Compatible-preset coverage intercepts website navigation and spies on the browser wire: opening the
+preset performs no save/discovery; user-triggered discovery goes only to an isolated local server.
+It covers independent saves, retained failed drafts, unchanged chat/default models, protocol retirement
+and desktop/mobile keyboard behavior. Locale changes always restore English in teardown; documentation
+captures use the ordinary service form, excluding recommendation branding.
 
 Each scenario's app reset also removes the lane fixture repository's `origin` remote: the topbar's Remote /
 Pull request segments read the shared repo config, so an origin a push scenario added must never reshape a

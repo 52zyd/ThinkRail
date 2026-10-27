@@ -24,6 +24,13 @@ export function assertSafeRef(ref: string): void {
 	if (!isSafeRef(ref)) throw new Error(`Not a usable git ref: ${ref}`);
 }
 
+export function refersToLocalBranch(ref: string | undefined, name: string): boolean {
+	if (ref === undefined) return false;
+	const candidate = process.platform === "win32" ? ref.toLowerCase() : ref;
+	const branch = process.platform === "win32" ? name.toLowerCase() : name;
+	return [branch, `heads/${branch}`, `refs/heads/${branch}`].includes(candidate);
+}
+
 export function remoteNameOf(ref: string, remotes: readonly string[]): string | null {
 	let match: string | null = null;
 	for (const remote of remotes) {

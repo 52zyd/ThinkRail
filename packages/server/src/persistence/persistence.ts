@@ -40,10 +40,12 @@ function storedDirectory(path: string): string {
 	return resolve(path);
 }
 
-function readJson<T>(file: string, fallback: T): T {
+function readJson<T>(file: string, fallback: T, strict = false): T {
 	try {
 		return JSON.parse(readFileSync(join(dataDir(), file), "utf8")) as T;
-	} catch {
+	} catch (error) {
+		if (strict && !(error instanceof Error && "code" in error && error.code === "ENOENT"))
+			throw error;
 		return fallback;
 	}
 }
@@ -272,8 +274,28 @@ export function saveProjects(projects: Project[]): void {
 	writeJson("projects.json", projects);
 }
 
-export function loadWorkspaces(): Workspace[] {
-	return readJson<Workspace[]>("workspaces.json", []).map((workspace) => ({
+export function loadWorkspaces(opts: { strict?: boolean } = {}): Workspace[] {
+	const records = readJson<Workspace[]>("workspaces.json", [], opts.strict);
+	if (
+		opts.strict &&
+		(!Array.isArray(records) ||
+			records.some(
+				(workspace) =>
+					!workspace ||
+					typeof workspace.id !== "string" ||
+					typeof workspace.name !== "string" ||
+					typeof workspace.projectId !== "string" ||
+					(workspace.kind !== undefined &&
+						workspace.kind !== "default" &&
+						workspace.kind !== "external") ||
+					typeof workspace.worktreePath !== "string" ||
+					typeof workspace.branch !== "string" ||
+					typeof workspace.baseBranch !== "string" ||
+					(workspace.diffBase !== undefined && typeof workspace.diffBase !== "string"),
+			))
+	)
+		throw new Error("Invalid workspace registry");
+	return records.map((workspace) => ({
 		...workspace,
 		worktreePath: storedDirectory(workspace.worktreePath),
 	}));

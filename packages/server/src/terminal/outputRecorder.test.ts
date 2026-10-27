@@ -69,16 +69,30 @@ describe("outputRecorder", () => {
 	describe("alt screen", () => {
 		test("a full-screen app is not recorded, and the normal buffer survives it", () => {
 			const recorder = createOutputRecorder();
+			expect(recorder.alternateScreen).toBe(false);
 			recorder.push("before vim\r\n");
 			recorder.push(ALT_ON);
+			expect(recorder.alternateScreen).toBe(true);
 			recorder.push("~\r\n~\r\n~\r\nVIM - Vi IMproved\r\n");
 			recorder.push(ALT_OFF);
+			expect(recorder.alternateScreen).toBe(false);
 			recorder.push("after vim\r\n");
 
 			const text = body(recorder.snapshot());
 			expect(text).toContain("before vim");
 			expect(text).toContain("after vim");
 			expect(text).not.toContain("VIM - Vi IMproved");
+		});
+		test("a zero replay budget still tracks whether a live alternate screen needs redraw", () => {
+			const recorder = createOutputRecorder({ maxChars: 0 });
+			recorder.push(`${ALT_ON}live screen`);
+			expect(recorder.alternateScreen).toBe(true);
+			expect(recorder.snapshot()).toBe("");
+			recorder.push(ALT_OFF);
+			expect(recorder.alternateScreen).toBe(false);
+			recorder.push(ALT_ON);
+			recorder.dispose();
+			expect(recorder.alternateScreen).toBe(false);
 		});
 
 		test("output while the alt screen is open stays out even across many reads", () => {

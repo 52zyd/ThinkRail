@@ -10,6 +10,10 @@ tags: [chat]
 
 ## Responsibility
 
+The Skills dialog initially focuses its title, avoiding an automatically opened Reload tooltip
+covering the user's first pointer action. Tab traversal still reaches the controls normally.
+
+
 The chat/agent conversation UI: **presentational React primitives** that render pi's **canonical
 message / content-block model**, a **tool-renderer registry** (the extension point), and `ChatView`
 (the app-integration layer). Hand-rolled — pi ships no web UI, and the official

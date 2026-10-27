@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { type Workspace, WS_CHANNELS } from "@thinkrail/contracts";
@@ -35,6 +35,11 @@ let dataDir: string;
 const savedDataDir = process.env.THINKRAIL_DATA_DIR;
 const savedHistFile = process.env.HISTFILE;
 const savedHistSize = process.env.HISTSIZE;
+const savedShellEnvironment = {
+	SHELL: process.env.SHELL,
+	HOME: process.env.HOME,
+	USERPROFILE: process.env.USERPROFILE,
+};
 
 let pushed: PublishedFrame[] = [];
 const terminalFrameSignals = new Set<() => void>();
@@ -131,6 +136,12 @@ async function exitTerminalWithMarker(
 beforeEach(() => {
 	dataDir = mkdtempSync(join(tmpdir(), "trpi-terminal-test-"));
 	process.env.THINKRAIL_DATA_DIR = dataDir;
+	process.env.HOME = dataDir;
+	process.env.USERPROFILE = dataDir;
+	if (process.platform === "win32") {
+		process.env.SHELL = "C:/Program Files/Git/usr/bin/bash.exe";
+		writeFileSync(join(dataDir, ".bashrc"), 'export PATH="$PATH:/usr/bin:/bin"\n');
+	}
 	// Prevent test PTYs from polluting the user's shell history.
 	process.env.HISTFILE = join(dataDir, ".test_history");
 	process.env.HISTSIZE = "0";
@@ -158,6 +169,10 @@ afterEach(() => {
 	else process.env.HISTFILE = savedHistFile;
 	if (savedHistSize === undefined) delete process.env.HISTSIZE;
 	else process.env.HISTSIZE = savedHistSize;
+	for (const [key, value] of Object.entries(savedShellEnvironment)) {
+		if (value === undefined) delete process.env[key];
+		else process.env[key] = value;
+	}
 });
 
 test("a shell spawn failure is actionable and preserves replay for retry", () => {
