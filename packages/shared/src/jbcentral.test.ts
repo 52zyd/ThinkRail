@@ -584,9 +584,13 @@ describe("Central artifact watcher", () => {
 	});
 
 	test("re-arms deeper when a directory appears while the new watch is being installed", async () => {
-		const existing = new Set(["/users/test"]);
+		const home = join("/users", "test");
+		const pi = join(home, ".pi");
+		const extensions = join(pi, "agent", "extensions");
+		const existing = new Set([home]);
 		const callbacks = new Map<string, (entry: string | null) => void>();
 		const watched: string[] = [];
+		const installed = Promise.withResolvers<void>();
 		const stop = watchJbcentralArtifact(
 			() => {},
 			adapterDeps({
@@ -594,20 +598,23 @@ describe("Central artifact watcher", () => {
 				watchDirectory: (path, callback) => {
 					watched.push(path);
 					callbacks.set(path, callback);
-					if (path === "/users/test/.pi") {
-						existing.add("/users/test/.pi/agent");
-						existing.add("/users/test/.pi/agent/extensions");
+					if (path === pi) {
+						existing.add(join(pi, "agent"));
+						existing.add(extensions);
 					}
+					if (path === extensions) installed.resolve();
 					return { close: () => {} };
 				},
 			}),
 		);
-		existing.add("/users/test/.pi");
-		callbacks.get("/users/test")?.(".pi");
-		await new Promise((resolve) => setTimeout(resolve, 5));
-
-		expect(watched).toEqual(["/users/test", "/users/test/.pi", "/users/test/.pi/agent/extensions"]);
-		stop();
+		existing.add(pi);
+		callbacks.get(home)?.(".pi");
+		try {
+			await installed.promise;
+			expect(watched).toEqual([home, pi, extensions]);
+		} finally {
+			stop();
+		}
 	});
 
 	test("ignores unrelated churn in a watched ancestor of the artifact directory", async () => {
