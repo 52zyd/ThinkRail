@@ -524,6 +524,17 @@ test("external workspaces unlink even when dirty, and cannot delete their branch
 	expect(git(repo, "worktree", "list", "--porcelain")).toContain(path.replaceAll("\\", "/"));
 });
 
+test("branch previews use the stored workspace spelling for the same physical checkout", async () => {
+	const ws = await createWorkspace("p1");
+	const alias = join(directory, "worktree-alias");
+	symlinkSync(ws.worktreePath, alias, process.platform === "win32" ? "junction" : "dir");
+	saveWorkspaces([{ ...ws, worktreePath: alias }]);
+	const preview = await branchCleanupList("p1");
+	expect(preview.branches.find((branch) => branch.name === ws.branch)?.worktreePaths).toEqual([
+		alias,
+	]);
+});
+
 test("unsafe managed paths and replaced Git identities reject before deleting anything", async () => {
 	const ws = await createWorkspace("p1");
 	for (const path of [repo, directory, join(directory, "outside")]) {

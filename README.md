@@ -23,7 +23,7 @@
 无需自行安装 Bun、Node.js 或项目依赖即可使用随附的桌面包；项目操作仍需要可用的 Git，
 模型账号与凭据由用户自行配置。界面使用系统 WebView2，缺少运行时时需要补装。
 
-1. 下载 [`bytools/thinkrail-desktop-windows-x64.zip`](bytools/thinkrail-desktop-windows-x64.zip)，在 GitHub 文件页选择下载原始文件。
+1. 从[本仓库的最新正式 Release](https://github.com/52zyd/ThinkRail/releases/latest) 下载 `thinkrail-desktop-windows-x64.zip`。
 2. **完整解压**压缩包，不要在压缩包预览中直接运行程序。
 3. 在解压目录中双击 `ThinkRail-Setup.exe`，按提示安装。必须保留旁边的 `.installer` 文件夹。
 4. 已安装 ThinkRail 的用户，先退出应用并备份个人配置与聊天记录。本包沿用原项目的应用标识，不保证与官方版本并存。
@@ -33,19 +33,22 @@
 
 社区安装包**未签名**。Windows 可能显示发布者未知或
 SmartScreen 警告，请核实来源后自行决定是否运行，不需要关闭系统安全防护。
-[`bytools/SHA256SUMS`](bytools/SHA256SUMS) 用于检查完整性，不代替代码签名或来源认证：
+同一 Release 中的 `SHA256SUMS` 用于检查完整性，不代替代码签名或来源认证：
 
 ```powershell
 Get-FileHash .\thinkrail-desktop-windows-x64.zip -Algorithm SHA256
 ```
 
-将输出与 `SHA256SUMS` 中对应文件的值比较。完整说明和安装包验证边界见
-[`bytools/README.txt`](bytools/README.txt)。尚未在全新 Windows 系统上验证安装与卸载；
-展开载荷的原生窗口和共享宿主冒烟已通过，但完整单元与浏览器套件仍存在失败，不能视为正式发行验收通过。
+将输出与 `SHA256SUMS` 中对应文件的值比较。正式包由手动 Windows 发布流程构建，
+通过 Linux 全量单元测试、Windows 原生与路径检查、完整无真实模型浏览器套件，以及 CLI、
+桌面和安装包冒烟后才上传。构建来源与验证结果见对应 Release 的
+[Actions 记录](https://github.com/52zyd/ThinkRail/actions/workflows/release-windows.yml)。
 
 **更新来源**：本版本的桌面更新与 CLI 安装脚本仅使用
 [`52zyd/ThinkRail`](https://github.com/52zyd/ThinkRail/releases)，不回退上游。
-随附的本地 Windows 构建版本为 `0.1.0`，尚未正式发布；正式包由仓库的手动发布工作流构建和验证。
+初始稳定版本为 `0.1.0`；正式包与校验和以版本 Release 为准，`bytools/` 保留本地交付副本。
+桌面更新清单与载荷发布在独立的 `desktop-updates` Release。同为 `0.1.0` 的本地构建不会
+收到同版本升级提示；需要正式构建时，手动安装完整 Release ZIP。
 旧安装包仍内嵌上游更新地址，必须手动重装本仓库的新完整 ZIP 后才能迁移；个人数据不会自动删除。
 macOS 和 Linux 可从源码自行构建；本仓库不宣称提供这些平台的已验证签名包。
 

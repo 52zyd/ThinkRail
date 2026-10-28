@@ -10,6 +10,7 @@ import { CodedError } from "@thinkrail/shared/codedError";
 import { purgeWorkspaceSessions, withWorkspaceSessionsClosed } from "../agent";
 import { forgetWorkspaceChanges } from "../changes";
 import {
+	canonicalPath,
 	currentBranch,
 	deleteLocalBranch,
 	listBranchesForCleanup,
@@ -78,18 +79,26 @@ function assertNoWorkspaceReferences(input: BranchDeleteInput, excludingId?: str
 export async function branchCleanupList(projectId: string): Promise<BranchCleanupList> {
 	const list = await listBranchesForCleanup(projectId);
 	const workspaces = repositoryWorkspaces(projectId);
+	const workspacePaths = new Map(
+		workspaces.map((workspace) => [canonicalPath(workspace.worktreePath), workspace.worktreePath]),
+	);
 	return {
 		...list,
 		branches: list.branches.map((branch) => {
 			const references = workspaces.filter((workspace) => usesBranch(workspace, branch.name));
-			return references.length
-				? {
-						...branch,
-						blockedReason: branch.blockedReason ?? "workspace",
-						workspaceNames: references.map((workspace) => workspace.name),
-						workspaceIds: references.map((workspace) => workspace.id),
-					}
-				: branch;
+			return {
+				...branch,
+				worktreePaths: branch.worktreePaths.map(
+					(path) => workspacePaths.get(canonicalPath(path)) ?? path,
+				),
+				...(references.length
+					? {
+							blockedReason: branch.blockedReason ?? "workspace",
+							workspaceNames: references.map((workspace) => workspace.name),
+							workspaceIds: references.map((workspace) => workspace.id),
+						}
+					: {}),
+			};
 		}),
 	};
 }

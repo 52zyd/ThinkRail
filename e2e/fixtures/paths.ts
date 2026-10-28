@@ -7,6 +7,7 @@ import { MAX_E2E_SHARDS } from "../shardPlan";
 import { claimPortBlock, PORT_BLOCK_SLOTS, PORT_BLOCK_STRIDE } from "./portBlock";
 
 const repoRoot = realpathSync(dirname(dirname(dirname(fileURLToPath(import.meta.url)))));
+const temporaryDir = realpathSync.native(tmpdir());
 const rootHash = createHash("sha256").update(repoRoot).digest("hex");
 
 const WORKTREE_KEY = `${basename(repoRoot).replace(/[^A-Za-z0-9._-]+/g, "-")}-${rootHash.slice(0, 8)}`;
@@ -53,7 +54,7 @@ export const E2E_BINARY_PORT = PORT_BASE + 2;
 
 export const E2E_RESTART_PORT = PORT_BASE + 4;
 
-export const E2E_DATA_DIR = join(tmpdir(), `thinkrail-e2e-${E2E_STATE_KEY}`);
+export const E2E_DATA_DIR = join(temporaryDir, `thinkrail-e2e-${E2E_STATE_KEY}`);
 
 export const E2E_HOME_DIR = join(E2E_DATA_DIR, "home");
 
@@ -80,9 +81,9 @@ export const E2E_CENTRAL_ARTIFACT_SEED = join(E2E_DATA_DIR, "real-central-extens
 
 export const E2E_FIXTURE_REPO = join(E2E_DATA_DIR, "sample-project");
 
-export const E2E_BINARY_CACHE = join(tmpdir(), `thinkrail-e2e-binary-cache-${E2E_STATE_KEY}`);
+export const E2E_BINARY_CACHE = join(temporaryDir, `thinkrail-e2e-binary-cache-${E2E_STATE_KEY}`);
 
-export const E2E_DESKTOP_CACHE = join(tmpdir(), `thinkrail-e2e-desktop-cache-${E2E_STATE_KEY}`);
+export const E2E_DESKTOP_CACHE = join(temporaryDir, `thinkrail-e2e-desktop-cache-${E2E_STATE_KEY}`);
 
 export const E2E_DESKTOP_READY_FILE = join(E2E_DATA_DIR, "desktop.ready.json");
 
@@ -106,9 +107,9 @@ export const E2E_PI_AGENT_DIR = join(E2E_DATA_DIR, "pi-agent");
 
 export const E2E_PI_MODELS_SEED = join(E2E_DATA_DIR, "pi-agent-models.seed.json");
 
-export const E2E_RESTART_DATA_DIR = join(tmpdir(), `thinkrail-e2e-restart-${E2E_STATE_KEY}`);
+export const E2E_RESTART_DATA_DIR = join(temporaryDir, `thinkrail-e2e-restart-${E2E_STATE_KEY}`);
 
 export const E2E_RESTART_HOST_LOG = join(
-	tmpdir(),
+	temporaryDir,
 	`thinkrail-e2e-restart-${E2E_STATE_KEY}-host.log`,
 );

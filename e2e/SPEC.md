@@ -35,7 +35,7 @@ installed Git Bash. One compiled launcher per lane is hard-linked under each com
 PATH remains fixture-bin plus native Git; shell-only utility paths are added inside the fixture
 launcher, never exposed to host agent/editor discovery. Install-state simulation uses filesystem
 rename, and direct fake-Central calls use that same platform executable.
-Interactive Windows fixtures use Git Bash itself as the PTY process, with utility PATH setup in
+Interactive Windows fixtures use Git Bash itself as the PTY process, with UTF-8 locale and utility PATH setup in
 the fixture HOME's bashrc. A permanent launcher child must not distort shell-busy detection.
 Fixture resets and source-suite teardown dispose chats and close all workspace terminals before
 removing their directories; Windows keeps live PTY working directories locked. Artifact runners
@@ -44,6 +44,8 @@ Windows fixture-root teardown removes reparse entries themselves with nonrecursi
 before ordinary tree removal. WebView2 can create a protected Content.IE5 compatibility entry that
 Bun's recursive removal cannot handle. The walk never descends into a reparse target; it accepts only
 the named ThinkRail E2E roots directly under the temporary directory.
+Fixture storage uses the temporary directory's native spelling, matching Git and the host's cwd
+instead of encoding Windows short-name aliases into a different pi session directory.
 The native walk uses Windows namespaced paths after validating that root, so long encoded session
 directories do not hit the legacy PowerShell filesystem API's path limit.
 Turbo passes through `SystemRoot` so native PowerShell probes remain available with a hermetic PATH.
@@ -55,7 +57,8 @@ native state can arrive before the host's saved language. Its version, single di
 snapshot assertions remain exact.
 Workspace creation fixtures wait for the initial chat body, not only its tab, before interacting with
 other resources. Terminal command fixtures await attachment and keyboard focus. Specs failure probes
-keep reads failing until the explicit Retry step so unrelated watcher nudges cannot end the fault.
+keep new and already-pending reads failing until the explicit Retry step, so a late response or
+unrelated watcher nudge cannot end the fault.
 
 `bun run e2e` is the complete no-agent gate. It builds the web bundle once and runs machine-adaptive,
 process-level Playwright shards. A shard owns one host and one Playwright worker; serial execution inside
@@ -64,6 +67,8 @@ lanes independent. Playwright splits individual tests across lanes and the paren
 reports into one normal result. It also merges shard failure ids into Playwright's root last-run file,
 so `--last-failed` remains a valid serial repair loop. No-agent coverage is identical whether the count
 is one or many.
+CI lanes also stream the line reporter, exposing each failure while the remaining lanes run;
+the blob reports still own the final combined result.
 
 The automatic count is half the available CPU parallelism, clamped to 1–8. Developers may explicitly
 select 1–16 lanes; `e2e:serial` is the stable debugging fallback. A focused invocation carrying Playwright

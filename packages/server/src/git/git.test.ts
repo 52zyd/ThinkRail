@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter, join, resolve } from "node:path";
 import type { Workspace } from "@thinkrail/contracts";
 import { changedFileArgs, diffBaseRef, resolveDiffRange } from "./diffScope";
 import {
+	canonicalPath,
 	countPushDivergence,
 	gitCommitPaths,
 	gitDiffFile,
@@ -57,6 +58,15 @@ afterEach(() => {
 	else process.env.THINKRAIL_DATA_DIR = savedDataDir;
 	if (savedPath === undefined) delete process.env.PATH;
 	else process.env.PATH = savedPath;
+});
+
+test("canonical paths agree with Git's native working-tree spelling", () => {
+	const result = Bun.spawnSync(["git", "-C", repo, "rev-parse", "--show-toplevel"], {
+		stdout: "pipe",
+		stderr: "pipe",
+	});
+	expect(result.success).toBe(true);
+	expect(canonicalPath(repo)).toBe(resolve(result.stdout.toString().trim()));
 });
 
 function installGitWrapper(subcommand: string, runBeforeFailure = false): void {

@@ -9,6 +9,11 @@ async function proxySpecGraphFailure(page: Page) {
 	let readCount = 0;
 	await page.routeWebSocket(/\/ws(\?|$)/, (ws) => {
 		const server = ws.connectToServer();
+		const pendingReads = new Set<string>();
+		const failRead = (id: string) => {
+			injected = true;
+			ws.send(JSON.stringify({ id, ok: false, error: "injected spec failure" }));
+		};
 		ws.onMessage((message) => {
 			const raw = typeof message === "string" ? message : message.toString();
 			let frame: { id?: string; method?: string };
@@ -21,14 +26,25 @@ async function proxySpecGraphFailure(page: Page) {
 			if (frame.id && frame.method === "spec.graph") {
 				readCount += 1;
 				if (armed) {
-					injected = true;
-					ws.send(JSON.stringify({ id: frame.id, ok: false, error: "injected spec failure" }));
+					failRead(frame.id);
 					return;
 				}
+				pendingReads.add(frame.id);
 			}
 			server.send(message);
 		});
-		server.onMessage((message) => ws.send(message));
+		server.onMessage((message) => {
+			const raw = typeof message === "string" ? message : message.toString();
+			let frame: { id?: string };
+			try {
+				frame = JSON.parse(raw);
+			} catch {
+				ws.send(message);
+				return;
+			}
+			if (frame?.id && pendingReads.delete(frame.id) && armed) failRead(frame.id);
+			else ws.send(message);
+		});
 	});
 	return {
 		arm: () => {

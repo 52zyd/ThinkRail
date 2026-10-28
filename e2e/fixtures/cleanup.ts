@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve, toNamespacedPath } from "node:path";
 import { removeTree } from "@thinkrail/shared/removeTree";
@@ -24,7 +24,7 @@ export function removeFixtureTree(path: string): void {
 	const root = resolve(path);
 	if (
 		!basename(root).startsWith("thinkrail-e2e-") ||
-		dirname(root).toLowerCase() !== resolve(tmpdir()).toLowerCase()
+		realpathSync.native(dirname(root)).toLowerCase() !== realpathSync.native(tmpdir()).toLowerCase()
 	)
 		throw new Error("Fixture cleanup requires a named ThinkRail E2E temporary root");
 	if (!existsSync(root)) return;

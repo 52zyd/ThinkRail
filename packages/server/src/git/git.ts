@@ -200,7 +200,7 @@ export function resolveDefaultBranch(repoPath: string): string {
 
 export function canonicalPath(path: string): string {
 	try {
-		return realpathSync(path);
+		return realpathSync.native(path);
 	} catch {
 		return resolve(path);
 	}

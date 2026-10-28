@@ -67,7 +67,10 @@ export default function globalSetup(config?: FullConfig): void | Promise<void> {
 
 		for (const rc of [".zshrc", ".bashrc"]) writeFileSync(join(E2E_HOME_DIR, rc), "");
 		if (process.platform === "win32")
-			writeFileSync(join(E2E_HOME_DIR, ".bashrc"), 'export PATH="$PATH:/usr/bin:/bin"\nPS1="$ "\n');
+			writeFileSync(
+				join(E2E_HOME_DIR, ".bashrc"),
+				'export PATH="$PATH:/usr/bin:/bin"\nexport LC_ALL=C.UTF-8\nPS1="$ "\n',
+			);
 
 		mkdirSync(E2E_FAKE_BIN_DIR, { recursive: true });
 		for (const command of ["central", "code", "github-ssh"] as const) {

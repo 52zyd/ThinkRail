@@ -231,7 +231,7 @@ ref off the workspace-create critical path.
   module for a user-owned workspace's folder-truth `branch`, with **`tryCurrentBranch`** its fallible form
   (`null` when the path is not a readable worktree root, so a refresh never persists an I/O failure as a
   detach); **`canonicalPath(path)`** — the symlink-resolved form any path compared against git output must
-  take (git resolves symlinks, a caller's path does not), shared with `workspaces`' worktree-identity
+  take (Git resolves symlinks and Windows short names through the native filesystem spelling), shared with `workspaces`' worktree-identity
   checks; `prefetchBranch(projectId, ref)` — best-effort background
   `git fetch` of a configured remote ref (via `gitAsync`), so a later `createWorkspace` branches off a
   fresh tip without the network round-trip on its critical path (local/unknown ref or offline → no-op).

@@ -15,6 +15,7 @@ test("Windows publication requires Linux full units and native Windows verificat
 	expect(build).toContain("needs: verify-units");
 	expect(build).toContain("runs-on: windows-latest");
 	expect(build).toContain("run: bun run test:windows-paths");
+	expect(build).toContain("--test-name-pattern 'canonical paths agree'");
 	expect(build).toContain("packages/server/src/subprocess");
 	expect(build).toContain("packages/server/src/host/branchCleanup.test.ts");
 	expect(build).toContain("packages/server/src/terminal");

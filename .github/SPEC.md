@@ -120,6 +120,8 @@ for the Windows build, matching the public CI's platform split: POSIX fixtures c
 Windows tests. Windows installs the locked dependencies and runs all fast gates, the enrolled native
 unit/path gates, cleanup/terminal regressions and the complete no-agent browser suite before invoking
 `build-binary`. Both platform gates must succeed before publication.
+The native Git path canary retains the runner's short-name temporary path, verifying canonical
+identity against Git rather than allowing canonicalized fixtures to hide a production alias defect.
 The native recipe stamps `{ version, channel, commit }`, smokes the CLI, expanded desktop and first-install
 artifact on the disposable Windows runner, and collects exact framework-generated names. No telemetry
 key or source-map upload credential is accepted. Installer smoke must never run on a user's workstation.

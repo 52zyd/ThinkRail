@@ -104,7 +104,7 @@ async function runShards(
 			...playwrightArgs,
 			...laneShardArgs(job, shard, shardCount),
 			"--workers=1",
-			"--reporter=blob",
+			process.env.CI ? "--reporter=blob,line" : "--reporter=blob",
 			`--output=${outputDir}`,
 		]);
 		const shardStartedAt = performance.now();

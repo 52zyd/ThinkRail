@@ -66,6 +66,7 @@ jobs:
       - run: bun test packages/pi-background-commands
       - run: bun test packages/server/src/subprocess
       - run: bun run test:windows-paths
+      - run: bun test packages/server/src/git/git.test.ts --test-name-pattern 'canonical paths agree'
       - run: bun test apps/desktop/src/windowsFrame.test.ts apps/desktop/src/windowChrome.test.ts
       - run: bun test --timeout 30000 packages/server/src/host/branchCleanup.test.ts packages/server/src/terminal scripts/e2eCleanup.test.ts scripts/e2eExecutables.test.ts
       - run: bunx playwright install chromium

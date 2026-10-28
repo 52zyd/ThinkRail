@@ -26,6 +26,8 @@ claiming that the branch was deleted; ordinary repeated removals remain idempote
 Older clients cannot invoke cleanup methods or branch-delete removal parameters.
 Workspace branch/base references share Git's local-ref matcher, including `heads/` and `refs/heads/`
 spellings and Windows case aliases, so direct requests cannot evade record protection.
+Preview worktree paths use an existing workspace record's spelling when native canonical paths
+match, so browser eligibility compares the same directory even through Windows short-name aliases.
 
 The four protocol-v91 `provider.compatible*` handlers delegate to agent's provider-settings adapter;
 the existing `provider.changed` broadcast invalidates both model and configuration reads. Responses
