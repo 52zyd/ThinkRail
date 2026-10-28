@@ -102,6 +102,8 @@ another.
    producing a packaged-only `undefined`. It then calls `bootHost({ resolveShellEnv: true, … })` on loopback port `0` with the staged web
    directory and baked version. Native `dom-ready` starts the updater, not attribution.
    The generated host returns only port, requested port, and lifecycle operations.
+   Startup fault fixtures use this current host contract; they do not require a removed opener or
+   attribution callback before exercising host acquisition and shutdown failures.
 5. Restore the valid route fragment and bounded client-preference map for
    `{ backendProfileId: "local", windowId: "main" }`. The route is appended to the fresh origin; the
    preference map is serialized as data and prepended to the preload source so the web client can hydrate

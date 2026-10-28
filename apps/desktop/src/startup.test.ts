@@ -78,12 +78,11 @@ mock.module(${JSON.stringify(runtimePath)}, () => {
   cwd.runtime = process.cwd();
   return {
     startDesktopHost: async (options) => {
-      if (typeof options.openExternal !== "function") throw new Error("missing packaged opener");
       calls.push("host");
       cwd.host = process.cwd();
       cwd.child = Bun.spawnSync([process.execPath, "-e", "process.stdout.write(process.cwd())"]).stdout.toString();
       if (failure === "boot") throw new Error("boot failed");
-      return { port: 12345, server: { startAttributionClaim: () => calls.push("claim-ready"), shutdown: async () => {
+      return { port: 12345, server: { shutdown: async () => {
         calls.push("shutdown-start");
         await Bun.sleep(10);
         calls.push("shutdown-end");
