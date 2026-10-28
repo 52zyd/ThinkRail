@@ -115,8 +115,11 @@ job on main every PR and merge group kept its own copy, about half of the reposi
 ## Windows release contract
 
 `release-windows.yml` is manual (`workflow_dispatch`), stable, Windows x64 only, default version `0.1.0`.
-It rejects malformed or previously published version tags. It installs the locked dependencies and runs
-all fast gates, unit tests and the complete no-agent browser suite before invoking `build-binary`.
+It rejects malformed or previously published version tags. Linux full-unit verification is a prerequisite
+for the Windows build, matching the public CI's platform split: POSIX fixtures cannot be replayed as
+Windows tests. Windows installs the locked dependencies and runs all fast gates, the enrolled native
+unit/path gates, cleanup/terminal regressions and the complete no-agent browser suite before invoking
+`build-binary`. Both platform gates must succeed before publication.
 The native recipe stamps `{ version, channel, commit }`, smokes the CLI, expanded desktop and first-install
 artifact on the disposable Windows runner, and collects exact framework-generated names. No telemetry
 key or source-map upload credential is accepted. Installer smoke must never run on a user's workstation.

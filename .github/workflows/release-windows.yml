@@ -16,7 +16,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify-units:
+    name: Full unit tests (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      - run: bun run test
+
   build:
+    needs: verify-units
     runs-on: windows-latest
     timeout-minutes: 90
     steps:
@@ -49,7 +62,12 @@ jobs:
       - run: bun run check:compiler
       - run: bun run lint
       - run: bun run typecheck
-      - run: bun run test
+      - run: bun test packages/spec-graph
+      - run: bun test packages/pi-background-commands
+      - run: bun test packages/server/src/subprocess
+      - run: bun run test:windows-paths
+      - run: bun test apps/desktop/src/windowsFrame.test.ts apps/desktop/src/windowChrome.test.ts
+      - run: bun test --timeout 30000 packages/server/src/host/branchCleanup.test.ts packages/server/src/terminal scripts/e2eCleanup.test.ts scripts/e2eExecutables.test.ts
       - run: bunx playwright install chromium
       - run: bun run e2e
       - id: native
