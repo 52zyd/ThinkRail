@@ -44,6 +44,8 @@ Windows fixture-root teardown removes reparse entries themselves with nonrecursi
 before ordinary tree removal. WebView2 can create a protected Content.IE5 compatibility entry that
 Bun's recursive removal cannot handle. The walk never descends into a reparse target; it accepts only
 the named ThinkRail E2E roots directly under the temporary directory.
+The native walk uses Windows namespaced paths after validating that root, so long encoded session
+directories do not hit the legacy PowerShell filesystem API's path limit.
 Turbo passes through `SystemRoot` so native PowerShell probes remain available with a hermetic PATH.
 Terminal cursor-query replay coverage injects the query at the live-data and replay-attach wire
 seams. Windows ConPTY can answer a process's query internally, so the browser must receive the same

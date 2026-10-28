@@ -42,3 +42,16 @@ test("fixture cleanup refuses an unrelated temporary directory", () => {
 		rmSync(root, { recursive: true, force: true });
 	}
 });
+
+test("fixture cleanup removes paths longer than the Windows legacy path limit", () => {
+	const root = mkdtempSync(join(tmpdir(), "thinkrail-e2e-cleanup-"));
+	const nested = join(root, "long-directory-".repeat(9), "nested-directory-".repeat(9));
+	mkdirSync(nested, { recursive: true });
+	writeFileSync(join(nested, "fixture.txt"), "remove the fixture\n");
+	try {
+		removeFixtureTree(root);
+		expect(existsSync(root)).toBe(false);
+	} finally {
+		rmSync(root, { recursive: true, force: true });
+	}
+});

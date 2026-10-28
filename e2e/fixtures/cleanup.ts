@@ -1,7 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve, toNamespacedPath } from "node:path";
 import { removeTree } from "@thinkrail/shared/removeTree";
 
 const REMOVE_REPARSE_ENTRIES = [
@@ -35,7 +35,7 @@ export function removeFixtureTree(path: string): void {
 			join(systemRoot, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
 			["-NoProfile", "-NonInteractive", "-Command", REMOVE_REPARSE_ENTRIES],
 			{
-				env: { ...process.env, THINKRAIL_FIXTURE_ROOT: root },
+				env: { ...process.env, THINKRAIL_FIXTURE_ROOT: toNamespacedPath(root) },
 				encoding: "utf8",
 				windowsHide: true,
 			},
