@@ -77,18 +77,26 @@ describe("the Windows probe", () => {
 		"a Git Bash PTY detects MSYS children and returns to idle after interruption",
 		async () => {
 			const fixture = mkdtempSync(join(tmpdir(), "thinkrail-busy-msys-"));
-			const terminal = spawn("C:/Program Files/Git/usr/bin/bash.exe", ["--noprofile", "--norc"], {
-				name: "xterm-256color",
-				cwd: fixture,
-				cols: 80,
-				rows: 24,
-				env: { ...process.env, HOME: fixture, USERPROFILE: fixture },
-			});
+			const terminal = spawn(
+				"C:/Program Files/Git/usr/bin/bash.exe",
+				["--noprofile", "--norc", "-i"],
+				{
+					name: "xterm-256color",
+					cwd: fixture,
+					cols: 80,
+					rows: 24,
+					env: { ...process.env, HOME: fixture, USERPROFILE: fixture, PS1: "TR_MSYS_PROMPT> " },
+				},
+			);
 			let output = "";
 			terminal.onData((data) => {
 				output += data;
 			});
 			try {
+				const startupDeadline = Date.now() + 15_000;
+				while (!output.includes("TR_MSYS_PROMPT>") && Date.now() < startupDeadline)
+					await Bun.sleep(20);
+				expect(output).toContain("TR_MSYS_PROMPT>");
 				terminal.write("printf TR_BUSY_%s READY; /usr/bin/sleep 30\r");
 				const deadline = Date.now() + 5000;
 				while (!output.includes("TR_BUSY_READY") && Date.now() < deadline) await Bun.sleep(20);
@@ -104,7 +112,7 @@ describe("the Windows probe", () => {
 				rmSync(fixture, { recursive: true, force: true });
 			}
 		},
-		15_000,
+		30_000,
 	);
 
 	test("passes the pid by environment, never by string interpolation", () => {

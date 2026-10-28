@@ -36,6 +36,8 @@ identities. A tab's shell outlives every client that looks at it; each frontend 
 Windows child-process inspection uses the system PowerShell path before PATH lookup. A repaired or
 hermetic PATH can omit PowerShell without making a running external process appear idle.
 Console-host infrastructure (`conhost.exe` / `OpenConsole.exe`) does not count as a shell job.
+Shell-selection fixtures inject their availability probe; native MSYS fixtures wait for a deterministic
+interactive prompt before writing, so installed tools and cold ConPTY startup cannot impersonate a result.
 
 - **Shell selection is terminal-local**, and Windows' choice is additionally user-configurable
   (`AppConfig.terminalWindowsShell`, `apps/web/src/panels/TerminalSettings.tsx`'s Windows-only picker;
