@@ -46,6 +46,9 @@ Bun's recursive removal cannot handle. The walk never descends into a reparse ta
 the named ThinkRail E2E roots directly under the temporary directory.
 Fixture storage uses the temporary directory's native spelling, matching Git and the host's cwd
 instead of encoding Windows short-name aliases into a different pi session directory.
+Trust-summary probes seed the native skills and prompts they assert, independently of test order or lane assignment.
+The Default-branch switch probe waits for the Windows fixture prompt and successful Git output
+before checking label convergence; terminal attachment alone does not establish shell readiness.
 The native walk uses Windows namespaced paths after validating that root, so long encoded session
 directories do not hit the legacy PowerShell filesystem API's path limit.
 Turbo passes through `SystemRoot` so native PowerShell probes remain available with a hermetic PATH.

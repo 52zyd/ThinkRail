@@ -57,7 +57,10 @@ test("a terminal branch switch converges every Default branch label live", async
 	await expect(row.getByTestId("workspace-branch")).toHaveText("main");
 
 	await waitTerminalReady(page);
+	if (process.platform === "win32")
+		await expect(visibleTerminalScreen(page)).toContainText(/\$\s*$/);
 	await runInTerminal(page, "git switch -c live-branch");
+	await expect(visibleTerminalScreen(page)).toContainText("Switched to a new branch 'live-branch'");
 
 	await expect(row.getByTestId("workspace-branch")).toHaveText("live-branch");
 	await expect(page.getByTestId("scope-branch")).toHaveText("live-branch");

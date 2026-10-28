@@ -91,6 +91,12 @@ test("a chat's Skills dialog names the project's Pi resources and grants them wi
 	const prompts = join(E2E_FIXTURE_REPO, ".pi", "prompts");
 	mkdirSync(prompts, { recursive: true });
 	writeFileSync(join(prompts, "e2e-kickoff.md"), "---\ndescription: Kick off\n---\nGo\n");
+	const skill = join(E2E_FIXTURE_REPO, ".pi", "skills", "e2e-native");
+	mkdirSync(skill, { recursive: true });
+	writeFileSync(
+		join(skill, "SKILL.md"),
+		"---\nname: e2e-native\ndescription: Isolated native Pi skill\n---\n\nUse only the fixture.\n",
+	);
 	try {
 		await openFixtureProject(page);
 		await createWorkspaceViaDialog(page);
