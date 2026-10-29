@@ -37,6 +37,8 @@ launcher, never exposed to host agent/editor discovery. Install-state simulation
 rename, and direct fake-Central calls use that same platform executable.
 Interactive Windows fixtures use Git Bash itself as the PTY process, with UTF-8 locale and utility PATH setup in
 the fixture HOME's bashrc. A permanent launcher child must not distort shell-busy detection.
+The shell-only PATH includes Git's `/cmd` directory explicitly; Git Bash can rewrite inherited
+Windows PATH entries, and `/usr/bin` alone does not contain the Git executable.
 Fixture resets and source-suite teardown dispose chats and close all workspace terminals before
 removing their directories; Windows keeps live PTY working directories locked. Artifact runners
 await filesystem teardown after stopping their already-owned host.

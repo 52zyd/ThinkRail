@@ -69,7 +69,7 @@ export default function globalSetup(config?: FullConfig): void | Promise<void> {
 		if (process.platform === "win32")
 			writeFileSync(
 				join(E2E_HOME_DIR, ".bashrc"),
-				'export PATH="$PATH:/usr/bin:/bin"\nexport LC_ALL=C.UTF-8\nPS1="$ "\n',
+				'export PATH="$PATH:/cmd:/usr/bin:/bin"\nexport LC_ALL=C.UTF-8\nPS1="$ "\n',
 			);
 
 		mkdirSync(E2E_FAKE_BIN_DIR, { recursive: true });
